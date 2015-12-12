@@ -6,7 +6,7 @@
 # This is an attempt to implement traditional something closer to a traditional
 # Forth as an interface layer over Parable.
 #
-# TODO  (+ is done, - is remaining, * is in progress)
+# TODO  (+ is done, - is remaining)
 #
 # + stack display
 # + word listing
@@ -14,13 +14,14 @@
 # + forth style defintions
 # + forth style comments
 # + forth style conditionals
+# + pep8 compliant source
 #
 # - multiline parsing
 # - forth style loops
 # - don't import the entire parable namespace
 # - file i/o (port from ika?)
-# - load stdlib extensions from a separate file? (~/.parable/amoeba.p or amoeba.p in the cwd)
-# - pep8 compliant source
+# - load stdlib extensions from a separate file?
+#   (~/.parable/amoeba.p or amoeba.p in the cwd)
 #
 
 import sys
@@ -120,7 +121,7 @@ def rewrite(str):
     count = len(tokens)
     i = 0
     condc = 0
-    conds = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+    conds = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     while i < count:
         token = tokens[i]
         if token == ":":
