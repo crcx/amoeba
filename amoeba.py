@@ -15,17 +15,17 @@
 # + forth style comments
 # + forth style conditionals
 # + pep8 compliant source
+# + don't import the entire parable namespace
 #
 # - multiline parsing
 # - forth style loops
-# - don't import the entire parable namespace
 # - file i/o (port from ika?)
 # - load stdlib extensions from a separate file?
 #   (~/.parable/amoeba.p or amoeba.p in the cwd)
 #
 
 import sys
-from parable import *
+import parable
 
 
 def display_item(prefix, value):
@@ -34,23 +34,22 @@ def display_item(prefix, value):
 
 def dump_stack():
     """display the stack"""
-    global stack
     i = 0
-    while i < len(stack):
-        tos = stack[i]
-        type = types[i]
+    while i < len(parable.stack):
+        tos = parable.stack[i]
+        type = parable.types[i]
         sys.stdout.write("\t" + str(i))
-        if type == TYPE_NUMBER:
+        if type == parable.TYPE_NUMBER:
             display_item('#', tos)
-        elif type == TYPE_CHARACTER:
+        elif type == parable.TYPE_CHARACTER:
             display_item('$', chr(tos))
-        elif type == TYPE_STRING:
-            display_item('\'', slice_to_string(tos) + '\'')
-        elif type == TYPE_POINTER:
+        elif type == parable.TYPE_STRING:
+            display_item('\'', parable.slice_to_string(tos) + '\'')
+        elif type == parable.TYPE_POINTER:
             display_item('&', tos)
-        elif type == TYPE_COMMENT:
-            display_item('"', slice_to_string(tos) + '"')
-        elif type == TYPE_FLAG:
+        elif type == parable.TYPE_COMMENT:
+            display_item('"', parable.slice_to_string(tos) + '"')
+        elif type == parable.TYPE_FLAG:
             if tos == -1:
                 display_item("", "true")
             elif tos == 0:
@@ -66,27 +65,26 @@ def dump_stack():
 def dump_dict():
     """display named items"""
     l = ''
-    for w in dictionary_names:
+    for w in parable.dictionary_names:
         l = l + w + ' '
     sys.stdout.write(l)
     sys.stdout.write("\n")
 
 
 def display_value():
-    global stack, types
-    i = len(stack) - 1
-    if types[i] == TYPE_NUMBER:
-        sys.stdout.write(str(stack[i]))
-    elif types[i] == TYPE_CHARACTER:
-        sys.stdout.write(str(chr(stack[i])))
-    elif types[i] == TYPE_STRING:
-        sys.stdout.write(slice_to_string(stack[i]))
-    elif types[i] == TYPE_POINTER:
-        sys.stdout.write('&' + str(stack[i]))
-    elif types[i] == TYPE_FLAG:
-        if stack[i] == -1:
+    i = len(parable.stack) - 1
+    if parable.types[i] == parable.TYPE_NUMBER:
+        sys.stdout.write(str(parable.stack[i]))
+    elif parable.types[i] == parable.TYPE_CHARACTER:
+        sys.stdout.write(str(chr(parable.stack[i])))
+    elif parable.types[i] == parable.TYPE_STRING:
+        sys.stdout.write(parable.slice_to_string(parable.stack[i]))
+    elif parable.types[i] == parable.TYPE_POINTER:
+        sys.stdout.write('&' + str(parable.stack[i]))
+    elif parable.types[i] == parable.TYPE_FLAG:
+        if parable.stack[i] == -1:
             sys.stdout.write("true")
-        elif stack[i] == 0:
+        elif parable.stack[i] == 0:
             sys.stdout.write("false")
         else:
             sys.stdout.write("malformed flag")
@@ -95,7 +93,7 @@ def display_value():
 def opcodes(slice, offset, opcode):
     if opcode == 9000:
         display_value()
-        stack_pop()
+        parable.stack_pop()
     elif opcode == 9010:
         dump_stack()
     elif opcode == 9020:
@@ -103,12 +101,13 @@ def opcodes(slice, offset, opcode):
     elif opcode == 9030:
         dump_dict()
     elif opcode == 9040:
-        s = request_slice()
+        s = parable.request_slice()
         i = 0
-        for word in dictionary_names:
-            store(string_to_slice(word), s, i, TYPE_STRING)
+        for word in parable.dictionary_names:
+            value = parable.string_to_slice(word)
+            parable.store(value, s, i, parable.TYPE_STRING)
             i = i + 1
-        stack_push(s, TYPE_POINTER)
+        parable.stack_push(s, parable.TYPE_POINTER)
 
     return offset
 
@@ -152,7 +151,7 @@ def rewrite(str):
             new = new + ' "'
         elif token == ")":
             new = new + '"'
-        elif is_number(token):
+        elif parable.is_number(token):
             new = new + " #" + token
         elif token == "\\":
             new = new + ' "'
@@ -167,16 +166,19 @@ def rewrite(str):
     return new
 
 
+def evaluate(s):
+    parable.interpret(parable.compile(s, parable.request_slice()))
+
 if __name__ == '__main__':
     print 'Amoeba, Copyright (c) 2015 Charles Childers\n'
-    prepare_slices()
-    prepare_dictionary()
-    parse_bootstrap(open('stdlib.p').readlines())
+    parable.prepare_slices()
+    parable.prepare_dictionary()
+    parable.parse_bootstrap(open('stdlib.p').readlines())
 
-    interpret(compile("[ \"v-\"  `9000 ] '?' define", request_slice()))
-    interpret(compile("[ \"-\"   `9010 ] '.s' define", request_slice()))
-    interpret(compile("[ \"-\"   `9020 ] 'bye' define", request_slice()))
-    interpret(compile("[ \"-\"   `9030 ] 'words' define", request_slice()))
+    evaluate("[ \"v-\"  `9000 ] '?' define")
+    evaluate("[ \"-\"   `9010 ] '.s' define")
+    evaluate("[ \"-\"   `9020 ] 'bye' define")
+    evaluate("[ \"-\"   `9030 ] 'words' define")
 
     while 1 == 1:
         sys.stdout.write("\nok ")
@@ -187,10 +189,11 @@ if __name__ == '__main__':
         if len(src) > 1:
             t = rewrite(src)
             print 'translate>> ' + t
-            interpret(compile(rewrite(src), request_slice()), opcodes)
+            slice = parable.request_slice()
+            parable.interpret(parable.compile(t, slice), opcodes)
 
-        for e in errors:
+        for e in parable.errors:
             sys.stdout.write(e)
 
-        clear_errors()
+        parable.clear_errors()
         sys.stdout.flush()
