@@ -24,12 +24,12 @@
 [ "nn-n"   `213 ] 'xor' define
 [ "-n"     `214 ] 'random' define
 [ "n-n"    `215 ] 'sqrt' define
-[ "nn-f"   `220 ] '<' define
-[ "nn-f"   `221 ] '>' define
-[ "nn-f"   `222 ] '<=' define
-[ "nn-f"   `223 ] '>=' define
-[ "vv-f"   `224 ] '=' define
-[ "vv-f"   `225 ] '<>' define
+[ "nn-f"   `220 ] 'lt?' define
+[ "nn-f"   `221 ] 'gt?' define
+[ "nn-f"   `222 ] 'lteq?' define
+[ "nn-f"   `223 ] 'gteq?' define
+[ "vv-f"   `224 ] 'eq?' define
+[ "vv-f"   `225 ] '-eq?' define
 [ "fpp-"   `300 ] 'if' define
 [ "p-"     `301 ] 'while-true' define
 [ "p-"     `302 ] 'while-false' define
@@ -116,8 +116,8 @@
 
 
 "Number functions"
-[ "nn-n"  over over < [ nip ] [ drop ] if ] 'max' define
-[ "nn-n"  over over > [ nip ] [ drop ] if ] 'min' define
+[ "nn-n"  over over lt? [ nip ] [ drop ] if ] 'max' define
+[ "nn-n"  over over gt? [ nip ] [ drop ] if ] 'min' define
 [ "n-n"  dup -1 * max ] 'abs' define
 
 
@@ -142,25 +142,25 @@
 [ "f-f"  :f :n -1 xor :f ] 'not' define
 [ "fp-"  [ ] if ] 'if-true' define
 [ "fp-"  [ ] swap if ] 'if-false' define
-[ "v-f"  :s 'nan' = ] 'nan?' define
-[ "v-f"  0 = ] 'zero?' define
+[ "v-f"  :s 'nan' eq? ] 'nan?' define
+[ "v-f"  0 eq? ] 'zero?' define
 [ "v-f"  :f :n zero? not ] 'true?' define
 [ "v-f"  :f :n zero? ] 'false?' define
 [ "n-f"  2 rem zero? ] 'even?' define
 [ "n-f"  2 rem zero? not ] 'odd?' define
-[ "n-f"  0 < ] 'negative?' define
-[ "n-f"  0 >= ] 'positive?' define
-[ "cp-"  [ type? CHARACTER = ] dip if-true ] 'if-character' define
-[ "sp-"  [ type? STRING = ] dip if-true ] 'if-string' define
-[ "np-"  [ type? NUMBER = ] dip if-true ] 'if-number' define
-[ "pp-"  [ type? POINTER = ] dip if-true ] 'if-pointer' define
-[ "fp-"  [ type? FLAG = ] dip if-true ] 'if-flag' define
-[ "nnn-f"  [ [ :n ] bi@ ] dip :n dup-pair > [ swap ] if-true [ over ] dip <= [ >= ] dip and :f ] 'between?' define
-[ "vv-vvf"  [ type? ] dip type? swap [ = ] dip swap ] 'types-match?' define
+[ "n-f"  0 lt? ] 'negative?' define
+[ "n-f"  0 gteq? ] 'positive?' define
+[ "cp-"  [ type? CHARACTER eq? ] dip if-true ] 'if-character' define
+[ "sp-"  [ type? STRING eq? ] dip if-true ] 'if-string' define
+[ "np-"  [ type? NUMBER eq? ] dip if-true ] 'if-number' define
+[ "pp-"  [ type? POINTER eq? ] dip if-true ] 'if-pointer' define
+[ "fp-"  [ type? FLAG eq? ] dip if-true ] 'if-flag' define
+[ "nnn-f"  [ [ :n ] bi@ ] dip :n dup-pair gt? [ swap ] if-true [ over ] dip lteq? [ gteq? ] dip and :f ] 'between?' define
+[ "vv-vvf"  [ type? ] dip type? swap [ eq? ] dip swap ] 'types-match?' define
 
 
 "numeric ranges"
-[ "nn-..."  dup-pair < [ [ [ dup 1 + ] dip dup-pair = ] while-false ] [ [ [ dup 1 - ] dip dup-pair = ] while-false ] if drop ] 'expand-range' define
+[ "nn-..."  dup-pair lt? [ [ [ dup 1 + ] dip dup-pair eq? ] while-false ] [ [ [ dup 1 - ] dip dup-pair eq? ] while-false ] if drop ] 'expand-range' define
 [ "...n-n"  1 - [ + ] times ] 'sum-range' define
 
 
@@ -179,14 +179,14 @@
 [ "v-f"  to-lowercase 'abcdefghijklmnopqrstuvwxyz1234567890' string-contains? ] 'alphanumeric?' define
 [ "v-f"  to-lowercase 'bcdfghjklmnpqrstvwxyz'                string-contains? ] 'consonant?' define
 [ "v-f"  to-lowercase 'aeiou'                                string-contains? ] 'vowel?' define
-[ "v-f"  dup to-lowercase = ] 'lowercase?' define
-[ "v-f"  dup to-uppercase = ] 'uppercase?' define
+[ "v-f"  dup to-lowercase eq? ] 'lowercase?' define
+[ "v-f"  dup to-uppercase eq? ] 'uppercase?' define
 [ "p-s"  invoke<depth?> 1 - [ [ :s ] bi@ + ] times ] 'build-string' define
 
 "Functions for trimming leading and trailing whitespace off of a string. The left side trim is iterative; the right side trim is recursive."
-[ "s-s"  :s #0 [ dup-pair fetch :n 32 = [ 1 + ] dip ] while-true 1 - [ last-index? ] dip swap subslice :s ] 'trim-left' define
+[ "s-s"  :s #0 [ dup-pair fetch :n 32 eq? [ 1 + ] dip ] while-true 1 - [ last-index? ] dip swap subslice :s ] 'trim-left' define
 [ ] 'trim-right' define
-[ "s-s"  :s last-index? dup-pair 1 - fetch :n nip 32 = [ last-index? 1 - 0 swap subslice :s trim-right ] if-true ] 'trim-right' define
+[ "s-s"  :s last-index? dup-pair 1 - fetch :n nip 32 eq? [ last-index? 1 - 0 swap subslice :s trim-right ] if-true ] 'trim-right' define
 [ "s-s"  trim-left trim-right ] 'trim' define
 
 
@@ -227,19 +227,21 @@
 "Arrays and Operations on Quotations"
 [ "q-v"  @ ] 'first' define
 [ "q-q"  1 over length? subslice ] 'rest' define
+[ "p-v"  slice-length? 1 - fetch ] 'last' define
 
 [ '*Found'  '*Value'  '*XT'  '*Source'  '*Target'  '*Offset' ] values
 [ "q-"   &*Found [ &*Value [ &*XT [ &*Source [ &*Target [ &*Offset [ invoke ] preserve ] preserve ] preserve ] preserve ] preserve ] preserve ] 'localize' define
 
 [ "vp-"    :p dup length? store ] 'push' define
 [ "p-v"    :p [ dup get-last-index fetch ] sip dup length? 2 - swap set-last-index ] 'pop' define
+[ "-p"     request [ pop drop ] sip ] 'request-empty' define
 [ "pnp-n"  [ to *XT over length? [ over pop *XT invoke ] times nip ] localize ] 'reduce' define
 [ "pp-?"   [ to *XT to *Source 0 to *Offset *Source length? [ *Source *Offset fetch *XT invoke *Offset 1 + to *Offset ] times ] localize ] 'for-each' define
-[ "pv-f"   false to *Found to *Value dup length? 0 swap [ dup-pair fetch *Value types-match? [ = *Found or :f to *Found ] [ drop-pair ] if 1 + ] times drop-pair *Found ] 'contains?' define
-[ "pq-p"   [ to *XT to *Source request to *Target *Target pop drop 0 to *Offset *Source length? [ *Source *Offset fetch *XT invoke [ *Source *Offset fetch *Target push ] if-true *Offset 1 + to *Offset ] times *Target ] localize ] 'filter' define
+[ "pv-f"   false to *Found to *Value dup length? 0 swap [ dup-pair fetch *Value types-match? [ eq? *Found or :f to *Found ] [ drop-pair ] if 1 + ] times drop-pair *Found ] 'contains?' define
+[ "pq-p"   [ to *XT to *Source request-empty to *Target 0 to *Offset *Source length? [ *Source *Offset fetch *XT invoke [ *Source *Offset fetch *Target push ] if-true *Offset 1 + to *Offset ] times *Target ] localize ] 'filter' define
 [ "pq-"    [ to *XT duplicate-slice to *Source 0 to *Offset *Source length? [ *Source *Offset fetch *XT invoke *Source *Offset store *Offset 1 + to *Offset ] times *Source ] localize ] 'map' define
 [ "p-p"    [ request to *Target invoke<depth?> 0 max [ *Target push ] times *Target 1 over length? subslice :p ] localize ] 'capture-results' define
-[ "pv-n"   [ to *Target to *Source 0 to *Offset -1 to *Found *Source length? [ *Source *Offset fetch *Target = [ *Offset to *Found ] if-true *Offset 1 + to *Offset ] times *Found ] localize ] 'index-of' define
+[ "pv-n"   [ to *Target to *Source 0 to *Offset -1 to *Found *Source length? [ *Source *Offset fetch *Target eq? [ *Offset to *Found ] if-true *Offset 1 + to *Offset ] times *Found ] localize ] 'index-of' define
 
 [ '*Found'  '*Value'  '*XT'  '*Source'  '*Target'  '*Offset'  'localize' ] hide-functions
 
@@ -263,18 +265,37 @@
 [ "s-n" chosen-hash *Hash-Prime rem ] 'hash' define
 
 
-"when: a conditional combinator"
-"[ [ [ condition ] [ code to execute if true ] ] \"
-"  [ [ condition ] [ code to execute if true ] ] \"
-"  [ [ true ]      [ default case ] ] \"
-"] when"
-
 [ '*CASES'  '*OFFSET'  'next'  'fetch-value'  '<when>' ] hide-functions
 [ '*TESTS'  '*DONE'  '*OFFSET' ] values
 [ *OFFSET 1 + to *OFFSET ] '<next>' define
 [ "q-"  *OFFSET [ *DONE [ *TESTS [ to *TESTS false to *DONE 0 to *OFFSET [ *TESTS *OFFSET fetch @ invoke [ true to *DONE *TESTS *OFFSET fetch 1 fetch invoke ] if-true <next> *DONE ] while-false ] dip to *TESTS ] dip to *DONE ] dip to *OFFSET ] 'when' define
 [ '*TESTS'  '*DONE'  '*OFFSET'  '<next>' ] hide-functions
 
+
+[ '*Source'  '*Value'  '*Target' ] values
+
+[ "n-"  [ *Source 0 ] dip subslice :s ] 'extract' define
+[ "n-"  *Source swap 1 + over length? subslice :s to *Source ] 'next-piece' define
+ 
+[ "ss-p" \
+  :s to *Value \
+  to *Source \
+  request-empty to *Target \
+  [ *Source *Value find dup \
+    -1 -eq? [ [ extract *Target push ] sip next-piece true ] \
+            [ drop *Source *Target push false ] if \
+  ] while-true \
+  *Target \
+] 'split' define
+
+[ "pv-s" \
+  :s to *Value \
+  reverse '' [ :s + *Value + ] reduce \
+  "This leaves the join value appended to the string. Remove it." \
+  0 over length? *Value length? - subslice rest :s \
+] 'join' define
+
+[ '*Source'  '*Value'  '*Target'  'extract'  'next-piece' ] hide-functions
 
 "apropos"
 [ "s-s" \
