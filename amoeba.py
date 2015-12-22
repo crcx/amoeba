@@ -108,6 +108,51 @@ def opcodes(slice, offset, opcode):
             parable.store(value, s, i, parable.TYPE_STRING)
             i = i + 1
         parable.stack_push(s, parable.TYPE_POINTER)
+    elif opcode == 3000:
+        slot = 0
+        i = 1
+        while i < 8:
+            if files[i] == 0:
+                slot = i
+            i = i + 1
+        mode = slice_to_string(stack_pop())
+        name = slice_to_string(stack_pop())
+        if slot != 0:
+            files[int(slot)] = open(name, mode)
+        stack_push(slot, TYPE_NUMBER)
+    elif opcode == 3001:
+        slot = int(stack_pop())
+        files[slot].close()
+        files[slot] = 0
+    elif opcode == 3002:
+        slot = int(stack_pop())
+        stack_push(ord(files[slot].read(1)), TYPE_NUMBER)
+    elif opcode == 3003:
+        slot = int(stack_pop())
+        files[slot].write(unichr(int(stack_pop())))
+    elif opcode == 3004:
+        slot = int(stack_pop())
+        stack_push(files[slot].tell(), TYPE_NUMBER)
+    elif opcode == 3005:
+        slot = int(stack_pop())
+        pos = int(stack_pop())
+        stack_push(files[slot].seek(pos, 0), TYPE_NUMBER)
+    elif opcode == 3006:
+        slot = int(stack_pop())
+        at = files[slot].tell()
+        files[slot].seek(0, 2) # SEEK_END
+        stack_push(files[slot].tell(), TYPE_NUMBER)
+        files[slot].seek(at, 0) # SEEK_SET
+    elif opcode == 3007:
+        name = slice_to_string(stack_pop())
+        if os.path.exists(name):
+            os.remove(name)
+    elif opcode == 3008:
+        name = slice_to_string(stack_pop())
+        if os.path.exists(name):
+            stack_push(-1, TYPE_FLAG)
+        else:
+            stack_push(0, TYPE_FLAG)
 
     return offset
 
@@ -180,6 +225,8 @@ if __name__ == '__main__':
     evaluate("[ \"-\"   `9020 ] 'bye' define")
     evaluate("[ \"-\"   `9030 ] 'words' define")
     evaluate("[ \"-p\"  `9040 ] 'wordlist' define")
+
+    parable.parse_bootstrap(open('amoeba.p').readlines())
 
     while 1 == 1:
         sys.stdout.write("\nok ")
