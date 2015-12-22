@@ -179,6 +179,7 @@ if __name__ == '__main__':
     evaluate("[ \"-\"   `9010 ] '.s' define")
     evaluate("[ \"-\"   `9020 ] 'bye' define")
     evaluate("[ \"-\"   `9030 ] 'words' define")
+    evaluate("[ \"-p\"  `9040 ] 'wordlist' define")
 
     while 1 == 1:
         sys.stdout.write("\nok ")
