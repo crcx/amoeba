@@ -1,0 +1,7 @@
+: test 12 = if 'True' else 'False' then ;
+
+1 test
+2 test
+3 test
+12 test
+

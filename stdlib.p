@@ -31,8 +31,8 @@
 [ "vv-f"   `224 ] 'eq?' define
 [ "vv-f"   `225 ] '-eq?' define
 [ "fpp-"   `300 ] 'if' define
-[ "p-"     `301 ] 'while-true' define
-[ "p-"     `302 ] 'while-false' define
+[ "p-"     `301 ] 'while' define
+[ "p-"     `302 ] 'until' define
 [ "np-"    `303 ] 'times' define
 [ "p-"     `305 ] 'invoke' define
 [ "vp-v"   `306 ] 'dip' define
@@ -60,6 +60,7 @@
 [ "s-f"    `601 ] 'function-exists?' define
 [ "s-p"    `602 ] 'lookup-function' define
 [ "s-"     `603 ] 'hide-function' define
+[ "p-s"    `604 ] 'lookup-name' define
 [ "ss-n"   `700 ] 'find' define
 [ "pnn-p"  `701 ] 'subslice' define
 [ "s-f"    `702 ] 'numeric?' define
@@ -85,6 +86,7 @@
 [ "-n"  600 ] 'BYTECODE' define
 [ "-n"  700 ] 'COMMENT' define
 [ "-n"  800 ] 'FUNCTION-CALL' define
+[ "v-c" COMMENT set-type ] ':comment' define
 
 
 "Stack Flow"
@@ -160,13 +162,14 @@
 
 
 "numeric ranges"
-[ "nn-..."  dup-pair lt? [ [ [ dup 1 + ] dip dup-pair eq? ] while-false ] [ [ [ dup 1 - ] dip dup-pair eq? ] while-false ] if drop ] 'expand-range' define
+[ "nn-..."  dup-pair lt? [ [ [ dup 1 + ] dip dup-pair eq? ] until ] [ [ [ dup 1 - ] dip dup-pair eq? ] until ] if drop ] 'expand-range' define
 [ "...n-n"  1 - [ + ] times ] 'sum-range' define
 
 
 "Misc"
 [ "p-"   invoke<depth?> [ hide-function ] times ] 'hide-functions' define
 [ "ss-"  swap dup function-exists? [ dup lookup-function swap hide-function swap define ] [ drop ] if ] 'rename-function' define
+[ "ps-"  dup hide-function define ] 'redefine' define
 [ "p-"   invoke<depth?> [ variable ] times ] 'variables' define
 
 
@@ -184,7 +187,7 @@
 [ "p-s"  invoke<depth?> 1 - [ [ :s ] bi@ + ] times ] 'build-string' define
 
 "Functions for trimming leading and trailing whitespace off of a string. The left side trim is iterative; the right side trim is recursive."
-[ "s-s"  :s #0 [ dup-pair fetch :n 32 eq? [ 1 + ] dip ] while-true 1 - [ last-index? ] dip swap subslice :s ] 'trim-left' define
+[ "s-s"  :s #0 [ dup-pair fetch :n 32 eq? [ 1 + ] dip ] while 1 - [ last-index? ] dip swap subslice :s ] 'trim-left' define
 [ ] 'trim-right' define
 [ "s-s"  :s last-index? dup-pair 1 - fetch :n nip 32 eq? [ last-index? 1 - 0 swap subslice :s trim-right ] if-true ] 'trim-right' define
 [ "s-s"  trim-left trim-right ] 'trim' define
@@ -283,7 +286,7 @@
           [ *Tests *Offset fetch @ invoke \
             [ true to *Done *Tests *Offset fetch 1 fetch invoke ] if-true \
             *Offset 1 + to *Offset *Done \
-          ] while-false \
+          ] until \
         ] dip to *Tests \
       ] dip to *Done \
     ] dip to *Offset \
@@ -293,7 +296,7 @@
 
 [ '*Source'  '*Value'  '*Target'  'extract'  'next-piece' ] {
   [ "n-"  [ *Source 0 ] dip subslice :s ] 'extract' define
-  [ "n-"  *Source swap 1 + over length? subslice :s to *Source ] 'next-piece' define
+  [ "n-"  *Source swap *Value length? + over length? subslice :s to *Source ] 'next-piece' define
 
   [ "ss-p" \
     :s to *Value \
@@ -302,7 +305,7 @@
     [ *Source *Value find dup \
       -1 -eq? [ [ extract *Target push ] sip next-piece true ] \
               [ drop *Source *Target push false ] if \
-    ] while-true \
+    ] while \
     *Target \
   ] 'split' define
 
@@ -312,6 +315,25 @@
     "This leaves the join value appended to the string. Remove it." \
     0 over length? *Value length? - subslice rest :s \
   ] 'join' define
+}
+
+[ "s-s"  [ :n 32 128 between? ] filter :s ] 'clean-string' define
+
+[ "sss-s"  [ split ] dip join clean-string ] 'replace' define
+
+
+[ '*Data'  '*Source'  '*String'  '(accumulate)'  '(next)' ] {
+  [ "-"  *String *Source first *Data first type? POINTER eq? [ invoke ] if-true :s + + to *String ] '(accumulate)' define
+  [ "-"  *Source rest to *Source  *Data rest to *Data ] '(next)' define
+
+  [ "ps-s" \
+    '{v}' split to *Source \
+    to *Data \
+    request-empty :s to *String \
+    *Data length? [ (accumulate) (next) ] times \
+    "Merge any remaining items" \
+    *String *Source ' ' join + clean-string \
+  ] 'interpolate' define
 }
 
 

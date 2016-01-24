@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # Amoeba
-# Copyright (c) 2013, 2015  Charles Childers
+# Copyright (c) 2013, 2015, 2016  Charles Childers
 #
 # This is an attempt to implement traditional something closer to a traditional
 # Forth as an interface layer over Parable.
@@ -24,6 +24,7 @@
 #   (~/.parable/amoeba.p or amoeba.p in the cwd)
 #
 
+import os
 import sys
 import parable
 
@@ -115,45 +116,54 @@ def opcodes(slice, offset, opcode):
             if files[i] == 0:
                 slot = i
             i = i + 1
-        mode = slice_to_string(stack_pop())
-        name = slice_to_string(stack_pop())
+        mode = parable.slice_to_string(parable.stack_pop())
+        name = parable.slice_to_string(parable.stack_pop())
         if slot != 0:
             files[int(slot)] = open(name, mode)
         stack_push(slot, TYPE_NUMBER)
     elif opcode == 3001:
-        slot = int(stack_pop())
+        slot = int(parable.stack_pop())
         files[slot].close()
         files[slot] = 0
     elif opcode == 3002:
-        slot = int(stack_pop())
+        slot = int(parable.stack_pop())
         stack_push(ord(files[slot].read(1)), TYPE_NUMBER)
     elif opcode == 3003:
-        slot = int(stack_pop())
-        files[slot].write(unichr(int(stack_pop())))
+        slot = int(parable.stack_pop())
+        files[slot].write(unichr(int(parable.stack_pop())))
     elif opcode == 3004:
-        slot = int(stack_pop())
-        stack_push(files[slot].tell(), TYPE_NUMBER)
+        slot = int(parable.stack_pop())
+        parable.stack_push(files[slot].tell(), TYPE_NUMBER)
     elif opcode == 3005:
-        slot = int(stack_pop())
-        pos = int(stack_pop())
-        stack_push(files[slot].seek(pos, 0), TYPE_NUMBER)
+        slot = int(parable.stack_pop())
+        pos = int(parable.stack_pop())
+        parable.stack_push(files[slot].seek(pos, 0), TYPE_NUMBER)
     elif opcode == 3006:
-        slot = int(stack_pop())
+        slot = int(parable.stack_pop())
         at = files[slot].tell()
         files[slot].seek(0, 2) # SEEK_END
-        stack_push(files[slot].tell(), TYPE_NUMBER)
+        parable.stack_push(files[slot].tell(), TYPE_NUMBER)
         files[slot].seek(at, 0) # SEEK_SET
     elif opcode == 3007:
-        name = slice_to_string(stack_pop())
+        name = parable.slice_to_string(parable.stack_pop())
         if os.path.exists(name):
             os.remove(name)
     elif opcode == 3008:
-        name = slice_to_string(stack_pop())
+        name = parable.slice_to_string(parable.stack_pop())
         if os.path.exists(name):
             stack_push(-1, TYPE_FLAG)
         else:
             stack_push(0, TYPE_FLAG)
-
+    elif opcode == 4000:
+        name = parable.slice_to_string(parable.stack_pop())
+        print name
+        if os.path.exists(name):
+            lines = parable.condense_lines(open(name).readlines())
+            for l in lines:
+                s = rewrite(l)
+                print s
+                slice = parable.request_slice()
+                parable.interpret(parable.compile(s, slice), opcodes)
     return offset
 
 
@@ -215,17 +225,10 @@ def evaluate(s):
     parable.interpret(parable.compile(s, parable.request_slice()))
 
 if __name__ == '__main__':
-    print 'Amoeba, Copyright (c) 2015 Charles Childers\n'
+    print 'Amoeba, Copyright (c) 2013-2016 Charles Childers\n'
     parable.prepare_slices()
     parable.prepare_dictionary()
     parable.parse_bootstrap(open('stdlib.p').readlines())
-
-    evaluate("[ \"v-\"  `9000 ] '?' define")
-    evaluate("[ \"-\"   `9010 ] '.s' define")
-    evaluate("[ \"-\"   `9020 ] 'bye' define")
-    evaluate("[ \"-\"   `9030 ] 'words' define")
-    evaluate("[ \"-p\"  `9040 ] 'wordlist' define")
-
     parable.parse_bootstrap(open('amoeba.p').readlines())
 
     while 1 == 1:

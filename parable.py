@@ -1,5 +1,5 @@
 # parable
-# Copyright (c) 2012-2015, Charles Childers
+# Copyright (c) 2012-2016, Charles Childers
 # ==========================================
 
 #
@@ -97,6 +97,7 @@ BC_QUOTE_NAME = 600
 BC_FUNCTION_EXISTS = 601
 BC_FUNCTION_LOOKUP = 602
 BC_FUNCTION_HIDE = 603
+BC_FUNCTION_NAME = 604
 BC_STRING_SEEK = 700
 BC_SLICE_SUBSLICE = 701
 BC_STRING_NUMERIC = 702
@@ -269,6 +270,13 @@ def interpret(slice, more=None):
                         a = slice_to_string(a)
                         b = slice_to_string(b)
                         stack_push(string_to_slice(b + a), TYPE_STRING)
+                    elif x == TYPE_POINTER and y == TYPE_POINTER:
+                        c = request_slice()
+                        d = get_last_index(b) + get_last_index(a) + 1
+                        set_slice_last_index(c, d)
+                        p_slices[c] = p_slices[b][:] + p_slices[a][:]
+                        p_types[c] = p_types[b][:] + p_types[a][:]
+                        stack_push(c, TYPE_POINTER)
                     else:
                         stack_push(a + b, TYPE_NUMBER)
                 else:
@@ -291,7 +299,11 @@ def interpret(slice, more=None):
                 if check_depth(slice, offset, 2):
                     a = stack_pop()
                     b = stack_pop()
-                    stack_push(b / a, TYPE_NUMBER)
+                    if a == 0 or b == 0:
+                        stack_push(float('nan'), TYPE_NUMBER)
+                        report('E04: Divide by Zero')
+                    else:
+                        stack_push(b / a, TYPE_NUMBER)
                 else:
                     offset = size
             elif opcode == BC_REMAINDER:
@@ -712,6 +724,12 @@ def interpret(slice, more=None):
                     name = slice_to_string(stack_pop())
                     if lookup_pointer(name) != -1:
                         remove_name(name)
+                else:
+                    offset = size
+            elif opcode == BC_FUNCTION_NAME:
+                if check_depth(slice, offset, 1):
+                    a = stack_pop()
+                    stack_push(string_to_slice(pointer_to_name(a)), TYPE_STRING)
                 else:
                     offset = size
             elif opcode == BC_STRING_SEEK:

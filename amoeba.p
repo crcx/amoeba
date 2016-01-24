@@ -1,3 +1,9 @@
+[ "v-"  `9000 ] '?' define
+[ "-"   `9010 ] '.s' define
+[ "-"   `9020 ] 'bye' define
+[ "-"   `9030 ] 'words' define
+[ "-p"  `9040 ] 'wordlist' define
+
 "File Operations"
 [ "string:name string:mode - number:file-id"  `3000 ] 'open-file' define
 [ "number:file-id -"  `3001 ] 'close-file' define
@@ -19,3 +25,15 @@
 }
 
 [ "string:name - flag"  `3008 ] 'file-exists?' define
+
+[ "s-" `4000 ] 'include' define
+
+
+
+"Conditionals"
+[ eq? ] '=' define
+[ -eq? ] '<>' define
+[ gt? ] '>' define
+[ lt? ] '<' define
+[ gteq? ] '>=' define
+[ lteq? ] '<=' define
