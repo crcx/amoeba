@@ -1,6 +1,7 @@
 # parable
 # Copyright (c) 2012-2016, Charles Childers
-# ==========================================
+# -+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+# coding: utf-8
 
 #
 # Dependencies
@@ -13,7 +14,7 @@ import sys
 # Memory Configuration
 #
 
-MAX_SLICES = 80000
+MAX_SLICES = 100000
 
 #
 # Constants for data types
@@ -25,7 +26,7 @@ TYPE_CHARACTER = 300
 TYPE_POINTER = 400
 TYPE_FLAG = 500
 TYPE_BYTECODE = 600
-TYPE_COMMENT = 700
+TYPE_REMARK = 700
 TYPE_FUNCTION_CALL = 800
 
 #
@@ -33,15 +34,8 @@ TYPE_FUNCTION_CALL = 800
 # These are loosely grouped by type
 #
 
-BC_TYPE_B = 100
-BC_TYPE_N = 101
-BC_TYPE_S = 102
-BC_TYPE_C = 103
-BC_TYPE_F = 104
-BC_TYPE_FLAG = 105
-BC_TYPE_CALL = 106
-BC_SET_TYPE = 109
-BC_GET_TYPE = 110
+BC_SET_TYPE = 100
+BC_GET_TYPE = 101
 BC_ADD = 200
 BC_SUBTRACT = 201
 BC_MULTIPLY = 202
@@ -58,6 +52,7 @@ BC_BITWISE_OR = 212
 BC_BITWISE_XOR = 213
 BC_RANDOM = 214
 BC_SQRT = 215
+BC_ROUND = 216
 BC_COMPARE_LT = 220
 BC_COMPARE_GT = 221
 BC_COMPARE_LTEQ = 222
@@ -74,6 +69,7 @@ BC_FLOW_DIP = 306
 BC_FLOW_SIP = 307
 BC_FLOW_BI = 308
 BC_FLOW_TRI = 309
+BC_FLOW_ABORT = 398
 BC_FLOW_RETURN = 399
 BC_MEM_COPY = 400
 BC_MEM_FETCH = 401
@@ -88,11 +84,7 @@ BC_MEM_GET_TYPE = 409
 BC_STACK_DUP = 500
 BC_STACK_DROP = 501
 BC_STACK_SWAP = 502
-BC_STACK_OVER = 503
-BC_STACK_TUCK = 504
-BC_STACK_NIP = 505
-BC_STACK_DEPTH = 506
-BC_STACK_CLEAR = 507
+BC_STACK_DEPTH = 503
 BC_QUOTE_NAME = 600
 BC_FUNCTION_EXISTS = 601
 BC_FUNCTION_LOOKUP = 602
@@ -163,10 +155,7 @@ errors = []
 def clear_errors():
     """remove all errors from the error log"""
     global errors
-    i = 0
-    while i < len(errors):
-        errors.pop()
-        i += 1
+    errors = []
 
 
 def report(text):
@@ -193,66 +182,32 @@ def check_depth(slice, offset, cells):
 #
 
 current_slice = 0
+should_abort = False
 
 
 def interpret(slice, more=None):
     """Interpret the byte codes contained in a slice."""
     global current_slice
+    global should_abort
     offset = 0
     size = get_last_index(int(slice))
     if current_slice == 0:
         current_slice = slice
-    while offset <= size:
+    while offset <= size and should_abort is not True:
         opcode = fetch(slice, offset)
         optype = fetch_type(slice, offset)
 
         if optype != TYPE_BYTECODE:
             stack_push(opcode, optype)
-            if optype == TYPE_COMMENT:
+            if optype == TYPE_REMARK:
                 stack_pop()
             if optype == TYPE_FUNCTION_CALL:
                 interpret(stack_pop(), more)
         else:
-            if opcode == BC_TYPE_B:
-                if check_depth(slice, offset, 1):
-                    stack_change_type(TYPE_BYTECODE)
-                else:
-                    offset = size
-            elif opcode == BC_TYPE_N:
-                if check_depth(slice, offset, 1):
-                    stack_change_type(TYPE_NUMBER)
-                else:
-                    offset = size
-            elif opcode == BC_TYPE_S:
-                if check_depth(slice, offset, 1):
-                    stack_change_type(TYPE_STRING)
-                else:
-                    offset = size
-            elif opcode == BC_TYPE_C:
-                if check_depth(slice, offset, 1):
-                    stack_change_type(TYPE_CHARACTER)
-                else:
-                    offset = size
-            elif opcode == BC_TYPE_F:
-                if check_depth(slice, offset, 1):
-                    stack_change_type(TYPE_POINTER)
-                else:
-                    offset = size
-            elif opcode == BC_TYPE_FLAG:
-                if check_depth(slice, offset, 1):
-                    stack_change_type(TYPE_FLAG)
-                else:
-                    offset = size
-            elif opcode == BC_TYPE_CALL:
-                if check_depth(slice, offset, 1):
-                    stack_change_type(TYPE_FUNCTION_CALL)
-                else:
-                    offset = size
-            elif opcode == BC_SET_TYPE:
+            if opcode == BC_SET_TYPE:
                 if check_depth(slice, offset, 2):
-                    a = stack_pop()  # type
-                    b = stack_pop()  # value
-                    stack_push(b, a)
+                    a = stack_pop()
+                    stack_change_type(a)
                 else:
                     offset = size
             elif opcode == BC_GET_TYPE:
@@ -270,12 +225,16 @@ def interpret(slice, more=None):
                         a = slice_to_string(a)
                         b = slice_to_string(b)
                         stack_push(string_to_slice(b + a), TYPE_STRING)
+                    elif x == TYPE_REMARK and y == TYPE_REMARK:
+                        a = slice_to_string(a)
+                        b = slice_to_string(b)
+                        stack_push(string_to_slice(b + a), TYPE_REMARK)
                     elif x == TYPE_POINTER and y == TYPE_POINTER:
                         c = request_slice()
                         d = get_last_index(b) + get_last_index(a) + 1
                         set_slice_last_index(c, d)
-                        p_slices[c] = p_slices[b][:] + p_slices[a][:]
-                        p_types[c] = p_types[b][:] + p_types[a][:]
+                        memory_values[c] = memory_values[b] + memory_values[a]
+                        memory_types[c] = memory_types[b] + memory_types[a]
                         stack_push(c, TYPE_POINTER)
                     else:
                         stack_push(a + b, TYPE_NUMBER)
@@ -380,6 +339,11 @@ def interpret(slice, more=None):
             elif opcode == BC_SQRT:
                 if check_depth(slice, offset, 1):
                     stack_push(math.sqrt(stack_pop()), TYPE_NUMBER)
+                else:
+                    offset = size
+            elif opcode == BC_ROUND:
+                if check_depth(slice, offset, 1):
+                    stack_push(round(stack_pop()), TYPE_NUMBER)
                 else:
                     offset = size
             elif opcode == BC_COMPARE_LT:
@@ -502,9 +466,9 @@ def interpret(slice, more=None):
                     offset = size
             elif opcode == BC_FLOW_IF:
                 if check_depth(slice, offset, 3):
-                    a = stack_pop()
-                    b = stack_pop()
-                    c = stack_pop()
+                    a = stack_pop()  # false
+                    b = stack_pop()  # true
+                    c = stack_pop()  # flag
                     if c == -1:
                         interpret(b, more)
                     else:
@@ -596,6 +560,8 @@ def interpret(slice, more=None):
                     interpret(a, more)
                 else:
                     offset = size
+            elif opcode == BC_FLOW_ABORT:
+                should_abort = True
             elif opcode == BC_FLOW_RETURN:
                 offset = size
             elif opcode == BC_MEM_COPY:
@@ -674,26 +640,8 @@ def interpret(slice, more=None):
                     stack_swap()
                 else:
                     offset = size
-            elif opcode == BC_STACK_OVER:
-                if check_depth(slice, offset, 2):
-                    stack_over()
-                else:
-                    offset = size
-            elif opcode == BC_STACK_TUCK:
-                if check_depth(slice, offset, 2):
-                    stack_tuck()
-                else:
-                    offset = size
-            elif opcode == BC_STACK_NIP:
-                if check_depth(slice, offset, 2):
-                    stack_swap()
-                    stack_drop()
-                else:
-                    offset = size
             elif opcode == BC_STACK_DEPTH:
                 stack_push(len(stack), TYPE_NUMBER)
-            elif opcode == BC_STACK_CLEAR:
-                stack_clear()
             elif opcode == BC_QUOTE_NAME:
                 if check_depth(slice, offset, 2):
                     name = slice_to_string(stack_pop())
@@ -728,8 +676,8 @@ def interpret(slice, more=None):
                     offset = size
             elif opcode == BC_FUNCTION_NAME:
                 if check_depth(slice, offset, 1):
-                    a = stack_pop()
-                    stack_push(string_to_slice(pointer_to_name(a)), TYPE_STRING)
+                    a = pointer_to_name(stack_pop())
+                    stack_push(string_to_slice(a), TYPE_STRING)
                 else:
                     offset = size
             elif opcode == BC_STRING_SEEK:
@@ -744,9 +692,9 @@ def interpret(slice, more=None):
                     a = int(stack_pop())
                     b = int(stack_pop())
                     s = int(stack_pop())
-                    c = p_slices[s]
+                    c = memory_values[s]
                     d = c[b:a]
-                    dt = p_types[s]
+                    dt = memory_types[s]
                     dt = dt[b:a]
                     e = request_slice()
                     i = 0
@@ -768,7 +716,7 @@ def interpret(slice, more=None):
             elif opcode == BC_SLICE_REVERSE:
                 if check_depth(slice, offset, 1):
                     a = stack_pop()
-                    p_slices[int(a)] = p_slices[int(a)][::-1]
+                    memory_values[int(a)] = memory_values[int(a)][::-1]
                     stack_push(a, TYPE_POINTER)
                 else:
                     offset = size
@@ -781,7 +729,7 @@ def interpret(slice, more=None):
                         stack_push(string_to_slice(a), TYPE_STRING)
                     elif t == TYPE_CHARACTER:
                         a = stack_pop()
-                        b = ''.join(unichr(a))
+                        b = ''.join(chr(a))
                         a = b.upper()
                         stack_push(ord(a[0].encode('utf-8')), TYPE_CHARACTER)
                     else:
@@ -799,7 +747,7 @@ def interpret(slice, more=None):
                         stack_push(string_to_slice(a), TYPE_STRING)
                     elif t == TYPE_CHARACTER:
                         a = stack_pop()
-                        b = ''.join(unichr(a))
+                        b = ''.join(chr(a))
                         a = b.lower()
                         stack_push(ord(a[0].encode('utf-8')), TYPE_CHARACTER)
                     else:
@@ -908,12 +856,6 @@ def tos():
     return len(stack) - 1
 
 
-def stack_tos():
-    """return the top element on the stack"""
-    global stack, types
-    return stack[tos()]
-
-
 def stack_type():
     """return the type identifier for the top item on the stack"""
     global stack, types
@@ -944,40 +886,17 @@ def stack_dup():
         stack_push(av, at)
 
 
-def stack_over():
-    """put a copy of the second item on the stack over the top item"""
-    """if the value is a string, makes a copy of it"""
-    at = stack_type()
-    av = stack_pop()
-    bt = stack_type()
-    bv = stack_pop()
-    stack_push(bv, bt)
-    stack_push(av, at)
-    if bt == TYPE_STRING:
-        s = request_slice()
-        copy_slice(bv, s)
-        stack_push(s, bt)
-    else:
-        stack_push(bv, bt)
-
-
-def stack_tuck():
-    """put a copy of the top item under the second item"""
-    """if the value is a string, makes a copy of it"""
-    stack_swap()
-    stack_over()
-
-
-def stack_change_type(type):
+def stack_change_type(desired):
     """convert the type of an item on the stack to a different type"""
     global types, stack
-    if type == TYPE_BYTECODE:
-        if stack_type() == TYPE_NUMBER:
-            a = stack_pop()
-            stack_push(a, TYPE_BYTECODE)
-    elif type == TYPE_NUMBER:
-        if stack_type() == TYPE_STRING:
-            if is_number(slice_to_string(stack_tos())):
+    original = stack_type()
+    if desired == TYPE_BYTECODE:
+        if original == TYPE_NUMBER:
+            types.pop()
+            types.append(TYPE_BYTECODE)
+    elif desired == TYPE_NUMBER:
+        if original == TYPE_STRING:
+            if is_number(slice_to_string(stack[tos()])):
                 stack_push(float(slice_to_string(stack_pop())), TYPE_NUMBER)
             else:
                 stack_pop()
@@ -985,13 +904,12 @@ def stack_change_type(type):
         else:
             types.pop()
             types.append(TYPE_NUMBER)
-    elif type == TYPE_STRING:
-        if stack_type() == TYPE_NUMBER:
-            stack_push(string_to_slice(unicode(stack_pop())), TYPE_STRING)
-        elif stack_type() == TYPE_CHARACTER:
-            a = stack_pop()
-            stack_push(string_to_slice(''.join(unichr(a))), TYPE_STRING)
-        elif stack_type() == TYPE_FLAG:
+    elif desired == TYPE_STRING:
+        if original == TYPE_NUMBER:
+            stack_push(string_to_slice(str(stack_pop())), TYPE_STRING)
+        elif original == TYPE_CHARACTER:
+            stack_push(string_to_slice(str(chr(stack_pop()))), TYPE_STRING)
+        elif original == TYPE_FLAG:
             s = stack_pop()
             if s == -1:
                 stack_push(string_to_slice('true'), TYPE_STRING)
@@ -999,23 +917,23 @@ def stack_change_type(type):
                 stack_push(string_to_slice('false'), TYPE_STRING)
             else:
                 stack_push(string_to_slice('malformed flag'), TYPE_STRING)
-        elif stack_type() == TYPE_POINTER:
+        elif original == TYPE_POINTER or original == TYPE_REMARK:
             types.pop()
             types.append(TYPE_STRING)
         else:
             return 0
-    elif type == TYPE_CHARACTER:
-        if stack_type() == TYPE_STRING:
+    elif desired == TYPE_CHARACTER:
+        if original == TYPE_STRING:
             s = slice_to_string(stack_pop())
             stack_push(ord(s[0].encode('utf-8')), TYPE_CHARACTER)
         else:
             s = stack_pop()
             stack_push(int(s), TYPE_CHARACTER)
-    elif type == TYPE_POINTER:
+    elif desired == TYPE_POINTER:
         types.pop()
         types.append(TYPE_POINTER)
-    elif type == TYPE_FLAG:
-        if stack_type() == TYPE_STRING:
+    elif desired == TYPE_FLAG:
+        if original == TYPE_STRING:
             s = slice_to_string(stack_pop())
             if s == 'true':
                 stack_push(-1, TYPE_FLAG)
@@ -1026,12 +944,13 @@ def stack_change_type(type):
         else:
             s = stack_pop()
             stack_push(s, TYPE_FLAG)
-    elif type == TYPE_FUNCTION_CALL:
-        if stack_type() == TYPE_NUMBER or stack_type() == TYPE_POINTER:
+    elif desired == TYPE_FUNCTION_CALL:
+        if original == TYPE_NUMBER or original == TYPE_POINTER:
             a = stack_pop()
             stack_push(a, TYPE_FUNCTION_CALL)
     else:
-        return
+        a = stack_pop()
+        stack_push(a, desired)          
 
 
 #
@@ -1042,7 +961,7 @@ def stack_change_type(type):
 
 dictionary_names = []
 dictionary_slices = []
-
+dictionary_hidden_slices = []
 
 def in_dictionary(s):
     global dictionary_names, dictionary_slices
@@ -1051,7 +970,6 @@ def in_dictionary(s):
 
 def lookup_pointer(name):
     global dictionary_names, dictionary_slices
-    name = name.lower()
     if in_dictionary(name) is False:
         return -1
     else:
@@ -1060,7 +978,6 @@ def lookup_pointer(name):
 
 def add_definition(name, slice):
     global dictionary_names, dictionary_slices
-    name = name.lower()
     if in_dictionary(name) is False:
         dictionary_names.append(name)
         dictionary_slices.append(slice)
@@ -1071,36 +988,35 @@ def add_definition(name, slice):
 
 
 def remove_name(name):
-    global dictionary_names, dictionary_slices
-    name = name.lower()
+    global dictionary_names, dictionary_slices, dictionary_hidden_slices
     if in_dictionary(name) is not False:
         i = dictionary_names.index(name)
         del dictionary_names[i]
+        dictionary_hidden_slices.append(dictionary_slices[i])
         del dictionary_slices[i]
 
 
 #
 # in parable, memory is divided into regions called slices
 # compiled code, strings, and other data are stored in these.
-# each slice can contain up to SLICE_LEN values
 #
 
-p_slices = []
-p_types = []
-p_map = []
-p_sizes = []
+memory_values = []
+memory_types = []
+memory_map = []
+memory_size = []
 
 
 def request_slice(attempts=1):
     """request a new memory slice"""
-    global p_slices, p_types, p_map, p_sizes, MAX_SLICES
+    global memory_values, memory_types, memory_map, memory_size, MAX_SLICES
     i = 0
     while i < MAX_SLICES:
-        if p_map[i] == 0:
-            p_map[i] = 1
-            p_slices[i] = [0]
-            p_types[i] = [TYPE_NUMBER]
-            p_sizes[i] = 0
+        if memory_map[i] == 0:
+            memory_map[i] = 1
+            memory_values[i] = [0]
+            memory_types[i] = [TYPE_NUMBER]
+            memory_size[i] = 0
             return i
         else:
             i += 1
@@ -1113,93 +1029,96 @@ def request_slice(attempts=1):
 
 def release_slice(slice):
     """release a slice. the slice should not be used after this is done"""
-    global p_map
-    p_map[int(slice)] = 0
+    global memory_map
+    memory_map[int(slice)] = 0
 
 
 def copy_slice(source, dest):
     """copy the contents of one slice to another"""
-    global p_slices, p_map, p_sizes
+    global memory_values, memory_map, memory_size
     i = 0
-    l = p_sizes[int(source)]
+    l = memory_size[int(source)]
     while i <= l:
         v = fetch(int(source), i)
         t = fetch_type(int(source), i)
         store(v, int(dest), i, t)
         i += 1
-    p_sizes[int(dest)] = p_sizes[int(source)]
+    memory_size[int(dest)] = memory_size[int(source)]
 
 
 def prepare_slices():
     """prepare the initial set of slices for use"""
-    global p_slices, p_types, p_map, p_sizes, MAX_SLICES
-    p_map = [0 for x in range(MAX_SLICES)]
-    p_slices = [0 for x in range(MAX_SLICES)]
-    p_types = [0 for x in range(MAX_SLICES)]
-    p_sizes = [0 for x in range(MAX_SLICES)]
+    global memory_values, memory_types, memory_map, memory_size, MAX_SLICES
+    memory_map = [0 for x in range(MAX_SLICES)]
+    memory_values = [0 for x in range(MAX_SLICES)]
+    memory_types = [0 for x in range(MAX_SLICES)]
+    memory_size = [0 for x in range(MAX_SLICES)]
 
 
 def fetch(slice, offset):
     """obtain a value stored in a slice"""
-    global p_slices, p_map
+    global memory_values, memory_map
     if get_last_index(slice) < offset:
         set_slice_last_index(slice, offset)
-    return p_slices[int(slice)][int(offset)]
+    return memory_values[int(slice)][int(offset)]
 
 
 def fetch_type(slice, offset):
     """obtain a value stored in a slice"""
-    global p_types, p_map
+    global memory_types, memory_map
     if get_last_index(slice) < offset:
         set_slice_last_index(slice, offset)
-    return p_types[int(slice)][int(offset)]
+    return memory_types[int(slice)][int(offset)]
 
 
 def store_type(slice, offset, type):
-    global p_slices, p_types, p_map
+    global memory_values, memory_types, memory_map
     if get_last_index(slice) < offset:
         set_slice_last_index(slice, offset)
-    p_types[int(slice)][int(offset)] = type
+    memory_types[int(slice)][int(offset)] = type
 
 
 def store(value, slice, offset, type=100):
     """store a value into a slice"""
-    global p_slices, p_types, p_map
+    global memory_values, memory_types, memory_map
     if get_last_index(slice) < offset:
         set_slice_last_index(slice, offset)
-    p_slices[int(slice)][int(offset)] = value
-    p_types[int(slice)][int(offset)] = type
+    memory_values[int(slice)][int(offset)] = value
+    memory_types[int(slice)][int(offset)] = type
 
 
 def get_last_index(slice):
     """get the length of a slice"""
-    global p_sizes
-    return p_sizes[int(slice)]
+    global memory_size
+    return memory_size[int(slice)]
 
 
 def set_slice_last_index(slice, size):
     """set the length of a slice"""
-    global p_slices, p_types, p_sizes
-    old_size = p_sizes[int(slice)]
+    global memory_values, memory_types, memory_size
+    old_size = memory_size[int(slice)]
     grow_by = size - old_size
     if grow_by > 0:
-        p_slices[int(slice)].extend(range(int(grow_by)))
-        p_types[int(slice)].extend(range(int(grow_by)))
+        memory_values[int(slice)].extend(list(range(int(grow_by))))
+        memory_types[int(slice)].extend(list(range(int(grow_by))))
     if grow_by < 0:
         while grow_by < 0:
             grow_by = grow_by + 1
-            del p_slices[int(slice)][-1]
-            del p_types[int(slice)][-1]
-    p_sizes[int(slice)] = size
+            del memory_values[int(slice)][-1]
+            del memory_types[int(slice)][-1]
+    memory_size[int(slice)] = size
 
 
 def string_to_slice(string):
     """convert a string into a slice"""
     s = request_slice()
-    i = 0
-    for char in list(string):
-        store(ord(char.encode('utf-8')), s, i, TYPE_CHARACTER)
-        i += 1
+    if string != '':
+        i = 0
+        for char in list(string):
+            store(ord(char.encode('utf-8')), s, i, TYPE_CHARACTER)
+            i += 1
+    else:
+        set_slice_last_index(s, -1)
     return s
 
 
@@ -1209,7 +1128,7 @@ def slice_to_string(slice):
     i = 0
     size = get_last_index(int(slice))
     while i <= size:
-        s.append(unichr(int(fetch(slice, i))))
+        s.append(chr(int(fetch(slice, i))))
         i += 1
     return ''.join(s)
 
@@ -1220,27 +1139,43 @@ def slice_to_string(slice):
 # the code here implements the garbage collector.
 #
 
+def is_pointer(type):
+    flag = False
+    if type == TYPE_POINTER or \
+       type == TYPE_STRING or \
+       type == TYPE_REMARK or \
+       type == TYPE_FUNCTION_CALL:
+        flag = True
+    else:
+        flag = False
+    return flag
+
+
 def find_references(s):
     """given a slice, return a list of all references in it"""
     ptrs = []
     i = 0
     if s < 0:
         return []
-    if get_last_index(s) == 0:
+    if get_last_index(s) <= 0:
         type = fetch_type(s, 0)
-        if type == TYPE_POINTER or type == TYPE_STRING or type == TYPE_COMMENT or type == TYPE_FUNCTION_CALL:
-            ptrs.append(int(fetch(s, 0)))
+        if is_pointer(type):
+            if not fetch(s, 0) in ptrs:
+                ptrs.append(int(fetch(s, 0)))
         if type == TYPE_POINTER or type == TYPE_FUNCTION_CALL:
             for xt in find_references(int(fetch(s, 0))):
-                ptrs.append(int(xt))
+                if not fetch(s, 0) in ptrs:
+                    ptrs.append(int(xt))
     else:
         while i < get_last_index(s):
             type = fetch_type(s, i)
-            if type == TYPE_POINTER or type == TYPE_STRING or type == TYPE_COMMENT or type == TYPE_FUNCTION_CALL:
-                ptrs.append(int(fetch(s, i)))
+            if is_pointer(type):
+                if not fetch(s, i) in ptrs:
+                    ptrs.append(int(fetch(s, i)))
             if type == TYPE_POINTER or type == TYPE_FUNCTION_CALL:
                 for xt in find_references(int(fetch(s, i))):
-                    ptrs.append(int(xt))
+                    if not xt in ptrs:
+                        ptrs.append(int(xt))
             i += 1
     return list(set(ptrs))
 
@@ -1248,37 +1183,47 @@ def find_references(s):
 def seek_all_references():
     """return a list of all references in all named slices and stack items"""
     global dictionary_slices, stack, types, current_slice
-    refs = []
+    sources = []
+
+    # Named items
     for s in dictionary_slices:
-        refs.append(s)
-        for x in find_references(s):
-            refs.append(x)
-    for x in find_references(current_slice):
-        refs.append(x)
+        if not s in sources:
+            sources.append(s)
+
+    # Previously named but now hidden items
+    for s in dictionary_hidden_slices:
+        if not s in sources:
+            sources.append(s)
+
+    # The current slice
+    if not current_slice in sources:
+        sources.append(current_slice)
+
+    # Strings, comments, pointers, function calls on the stack
     i = tos()
-    while i > 0:
-        if types[i] == TYPE_STRING or types[i] == TYPE_COMMENT or types[i] == TYPE_POINTER or types[i] == TYPE_FUNCTION_CALL:
-            refs.append(stack[i])
-            for x in find_references(stack[i]):
+    while i >= 0:
+        if is_pointer(types[i]):
+            sources.append(stack[i])
+        i = i - 1
+
+    refs = sources
+    for s in sources:
+        for x in find_references(s):
+            if not x in refs:
                 refs.append(x)
-        i -= 1
-    return list(set(refs))
+
+    return refs
 
 
 def collect_garbage():
     """scan memory, and collect unused slices"""
-    global MAX_SLICES, p_map
+    global MAX_SLICES, memory_map
     i = 0
     refs = seek_all_references()
     while i < MAX_SLICES:
-        if p_map[i] == 1:
-            try:
-                x = refs.index(i)
-            except:
-                if i > 0:
-                    release_slice(i)
-        i += 1
-
+        if not i in refs and memory_map[i] == 1:
+            release_slice(i)
+        i = i + 1
 
 #
 # the compiler is pretty trivial.
@@ -1324,7 +1269,7 @@ def compile_string(string, slice, offset):
 
 
 def compile_comment(string, slice, offset):
-    store(string_to_slice(string), slice, offset, TYPE_COMMENT)
+    store(string_to_slice(string), slice, offset, TYPE_REMARK)
     offset += 1
     return offset
 
@@ -1343,7 +1288,8 @@ def compile_pointer(name, slice, offset):
             store(lookup_pointer(name), slice, offset, TYPE_POINTER)
         else:
             store(0, slice, offset, TYPE_POINTER)
-            report('E03: Compile Error: Unable to map ' + name + ' to a pointer')
+            report('E03: Compile Error: Unable to map ' +
+                   name + ' to a pointer')
     offset += 1
     return offset
 
@@ -1353,7 +1299,8 @@ def compile_number(number, slice, offset):
         store(float(number), slice, offset, TYPE_NUMBER)
     else:
         store(float('nan'), slice, offset, TYPE_NUMBER)
-        report("E03: Compile Error: Unable to convert " + number + " to a number")
+        report("E03: Compile Error: Unable to convert " +
+               number + " to a number")
     offset += 1
     return offset
 
@@ -1378,7 +1325,7 @@ def parse_string(tokens, i, count, delimiter):
     a = tokens[i].endswith(delimiter)
     b = tokens[i] != delimiter
     c = tokens[i].endswith("\\" + delimiter)
-    if (a and b and not c):
+    if a and b and not c:
         s = tokens[i]
     else:
         j = i + 1
@@ -1388,7 +1335,7 @@ def parse_string(tokens, i, count, delimiter):
             s += tokens[j]
             a = tokens[j].endswith(delimiter)
             b = tokens[j].endswith("\\" + delimiter)
-            if (a and not b):
+            if a and not b:
                 i = j
                 j = count
             j += 1
@@ -1396,35 +1343,48 @@ def parse_string(tokens, i, count, delimiter):
 
 
 def compile(str, slice):
+    global should_abort
+    should_abort = False
     nest = []
-    cleaned = ' '.join(str.split())
-    tokens = cleaned.split(' ')
+    tokens = ' '.join(str.split()).split(' ')
     count = len(tokens)
     i = 0
     offset = 0
+    current = ""
+    prefix = ""
     while i < count:
+        current = tokens[i]
+        prefix = tokens[i][:1]
         s = ""
-        if (tokens[i].startswith('"') or tokens[i] == '"'):
+        if prefix == '"':
             i, s = parse_string(tokens, i, count, '"')
             offset = compile_comment(s[1:-1], slice, offset)
-        elif (tokens[i].startswith('\'') or tokens[i] == '\''):
+        elif prefix == "'":
             i, s = parse_string(tokens, i, count, '\'')
             offset = compile_string(s[1:-1], slice, offset)
-        elif tokens[i].startswith("$"):
-            v = ord(tokens[i][1:].encode('utf-8'))
+        elif prefix == "$":
+            v = ord(current[1:][0].encode('utf-8'))
             offset = compile_character(v, slice, offset)
-        elif tokens[i].startswith("&"):
-            offset = compile_pointer(tokens[i][1:], slice, offset)
-        elif tokens[i].startswith("#"):
-            offset = compile_number(tokens[i][1:], slice, offset)
-        elif tokens[i].startswith("`"):
-            offset = compile_bytecode(tokens[i][1:], slice, offset)
-        elif tokens[i] == "[":
+        elif prefix == "&":
+            offset = compile_pointer(current[1:], slice, offset)
+        elif prefix == "#":
+            offset = compile_number(current[1:], slice, offset)
+        elif prefix == "`":
+            offset = compile_bytecode(current[1:], slice, offset)
+        elif prefix == "@":
+            offset = compile_pointer(current[1:], slice, offset)
+            offset = compile_number(0, slice, offset)
+            offset = compile_bytecode(BC_MEM_FETCH, slice, offset)
+        elif prefix == "!":
+            offset = compile_pointer(current[1:], slice, offset)
+            offset = compile_number(0, slice, offset)
+            offset = compile_bytecode(BC_MEM_STORE, slice, offset)
+        elif current == "[":
             nest.append(slice)
             nest.append(offset)
             slice = request_slice()
             offset = 0
-        elif tokens[i] == "]":
+        elif current == "]":
             old = slice
             if offset == 0:
                 store(BC_FLOW_RETURN, slice, offset, TYPE_BYTECODE)
@@ -1433,10 +1393,10 @@ def compile(str, slice):
             store(old, slice, offset, TYPE_POINTER)
             offset += 1
         else:
-            if is_number(tokens[i]):
-                offset = compile_number(tokens[i], slice, offset)
+            if is_number(current):
+                offset = compile_number(current, slice, offset)
             else:
-                offset = compile_function_call(tokens[i], slice, offset)
+                offset = compile_function_call(current, slice, offset)
         i += 1
         if offset == 0:
             store(BC_FLOW_RETURN, slice, offset, TYPE_BYTECODE)
@@ -1445,8 +1405,7 @@ def compile(str, slice):
 
 def parse_bootstrap(f):
     """compile the bootstrap package it into memory"""
-    f = condense_lines(f)
-    for line in f:
+    for line in condense_lines(f):
         if len(line) > 0:
             interpret(compile(line, request_slice()))
 
