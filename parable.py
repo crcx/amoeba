@@ -14,7 +14,7 @@ import sys
 # Memory Configuration
 #
 
-MAX_SLICES = 100000
+INITIAL_SLICES = 100
 
 #
 # Constants for data types
@@ -29,86 +29,14 @@ TYPE_BYTECODE = 600
 TYPE_REMARK = 700
 TYPE_FUNCTION_CALL = 800
 
-#
-# Constants for byte codes
-# These are loosely grouped by type
-#
+# For precheck(), we also allow matching agains two "generic" types:
 
-BC_SET_TYPE = 100
-BC_GET_TYPE = 101
-BC_ADD = 200
-BC_SUBTRACT = 201
-BC_MULTIPLY = 202
-BC_DIVIDE = 203
-BC_REMAINDER = 204
-BC_FLOOR = 205
-BC_POW = 206
-BC_LOG = 207
-BC_LOG10 = 208
-BC_LOGN = 209
-BC_BITWISE_SHIFT = 210
-BC_BITWISE_AND = 211
-BC_BITWISE_OR = 212
-BC_BITWISE_XOR = 213
-BC_RANDOM = 214
-BC_SQRT = 215
-BC_ROUND = 216
-BC_COMPARE_LT = 220
-BC_COMPARE_GT = 221
-BC_COMPARE_LTEQ = 222
-BC_COMPARE_GTEQ = 223
-BC_COMPARE_EQ = 224
-BC_COMPARE_NEQ = 225
-BC_FLOW_IF = 300
-BC_FLOW_WHILE = 301
-BC_FLOW_UNTIL = 302
-BC_FLOW_TIMES = 303
-BC_FLOW_CALL = 304
-BC_FLOW_CALL_F = 305
-BC_FLOW_DIP = 306
-BC_FLOW_SIP = 307
-BC_FLOW_BI = 308
-BC_FLOW_TRI = 309
-BC_FLOW_ABORT = 398
-BC_FLOW_RETURN = 399
-BC_MEM_COPY = 400
-BC_MEM_FETCH = 401
-BC_MEM_STORE = 402
-BC_MEM_REQUEST = 403
-BC_MEM_RELEASE = 404
-BC_MEM_COLLECT = 405
-BC_MEM_GET_LAST = 406
-BC_MEM_SET_LAST = 407
-BC_MEM_SET_TYPE = 408
-BC_MEM_GET_TYPE = 409
-BC_STACK_DUP = 500
-BC_STACK_DROP = 501
-BC_STACK_SWAP = 502
-BC_STACK_DEPTH = 503
-BC_QUOTE_NAME = 600
-BC_FUNCTION_EXISTS = 601
-BC_FUNCTION_LOOKUP = 602
-BC_FUNCTION_HIDE = 603
-BC_FUNCTION_NAME = 604
-BC_STRING_SEEK = 700
-BC_SLICE_SUBSLICE = 701
-BC_STRING_NUMERIC = 702
-BC_SLICE_REVERSE = 703
-BC_TO_LOWER = 800
-BC_TO_UPPER = 801
-BC_REPORT = 900
-BC_TRIG_SIN = 1000
-BC_TRIG_COS = 1001
-BC_TRIG_TAN = 1002
-BC_TRIG_ASIN = 1003
-BC_TRIG_ACOS = 1004
-BC_TRIG_ATAN = 1005
-BC_TRIG_ATAN2 = 1006
+TYPE_ANY = 0
+TYPE_ANY_PTR = 1
 
+# -+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 
-#
-# Support code
-#
+# Support code used later on
 
 def is_number(s):
     """return True if s is a number, or False otherwise"""
@@ -122,12 +50,11 @@ def is_number(s):
 def condense_lines(code):
     """Take an array of code, join lines ending with a \, and return"""
     """the new array"""
-    m = len(code)
     s = ''
     r = []
     i = 0
     c = 0
-    while i < m:
+    while i < len(code):
         if code[i].endswith(' \\\n'):
             s = s + ' ' + code[i][:-2].strip()
             c = 1
@@ -141,13 +68,890 @@ def condense_lines(code):
         i = i + 1
     return r
 
+# -+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 
+# Byte Codes
 #
-# logging of errors
+# The Parable virtual machine is byte coded; each byte code corresponds to a
+# single instruction. In this section we assign each byte code a symbolic
+# name and value, provide an implementation for each (with one exception:
+# see interpet() for details on this), and then build a dispatch table that
+# maps each instuction to its handler.
+
+
+# Constants for byte codes
+
+BC_NOP = 0
+BC_SET_TYPE = 1
+BC_GET_TYPE = 2
+BC_ADD = 3
+BC_SUBTRACT = 4
+BC_MULTIPLY = 5
+BC_DIVIDE = 6
+BC_REMAINDER = 7
+BC_POW = 8
+BC_LOGN = 9
+BC_BITWISE_SHIFT = 10
+BC_BITWISE_AND = 11
+BC_BITWISE_OR = 12
+BC_BITWISE_XOR = 13
+BC_RANDOM = 14
+BC_SQRT = 15
+BC_ROUND = 16
+BC_COMPARE_LT = 17
+BC_COMPARE_GT = 18
+BC_COMPARE_LTEQ = 19
+BC_COMPARE_GTEQ = 20
+BC_COMPARE_EQ = 21
+BC_COMPARE_NEQ = 22
+BC_FLOW_IF = 23
+BC_FLOW_WHILE = 24
+BC_FLOW_UNTIL = 25
+BC_FLOW_TIMES = 26
+BC_FLOW_CALL = 27
+BC_FLOW_DIP = 28
+BC_FLOW_SIP = 29
+BC_FLOW_BI = 30
+BC_FLOW_TRI = 31
+BC_FLOW_ABORT = 32
+BC_FLOW_RETURN = 33
+BC_MEM_COPY = 34
+BC_MEM_FETCH = 35
+BC_MEM_STORE = 36
+BC_MEM_REQUEST = 37
+BC_MEM_RELEASE = 38
+BC_MEM_COLLECT = 39
+BC_MEM_GET_LAST = 40
+BC_MEM_SET_LAST = 41
+BC_MEM_SET_TYPE = 42
+BC_MEM_GET_TYPE = 43
+BC_STACK_DUP = 44
+BC_STACK_DROP = 45
+BC_STACK_SWAP = 46
+BC_STACK_DEPTH = 47
+BC_QUOTE_NAME = 48
+BC_FUNCTION_HIDE = 49
+BC_STRING_SEEK = 50
+BC_SLICE_SUBSLICE = 51
+BC_STRING_NUMERIC = 52
+BC_SLICE_REVERSE = 53
+BC_TO_LOWER = 54
+BC_TO_UPPER = 55
+BC_REPORT = 56
+BC_VM_NAMES = 57
+BC_VM_SLICES = 58
+BC_TRIG_SIN = 59
+BC_TRIG_COS = 60
+BC_TRIG_TAN = 61
+BC_TRIG_ASIN = 62
+BC_TRIG_ACOS = 63
+BC_TRIG_ATAN = 64
+BC_TRIG_ATAN2 = 65
+BC_VM_MEM_MAP = 66
+BC_VM_MEM_SIZES = 67
+BC_VM_MEM_ALLOC = 68
+
+
+# Implement the byte code functions
+
+def bytecode_nop(opcode, offset, more):
+    return
+
+
+def bytecode_set_type(opcode, offset, more):
+    if precheck([TYPE_ANY, TYPE_NUMBER]):
+        a = stack_pop()
+        stack_change_type(a)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_get_type(opcode, offset, more):
+    if precheck([TYPE_ANY]):
+        stack_push(stack_type(), TYPE_NUMBER)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_add(opcode, offset, more):
+    if precheck([TYPE_NUMBER, TYPE_NUMBER]):
+        a = stack_pop()
+        b = stack_pop()
+        stack_push(b + a, TYPE_NUMBER)
+    elif precheck([TYPE_STRING, TYPE_STRING]):
+        a = slice_to_string(stack_pop())
+        b = slice_to_string(stack_pop())
+        stack_push(string_to_slice(b + a), TYPE_STRING)
+    elif precheck([TYPE_REMARK, TYPE_REMARK]):
+        a = slice_to_string(stack_pop())
+        b = slice_to_string(stack_pop())
+        stack_push(string_to_slice(b + a), TYPE_REMARK)
+    elif precheck([TYPE_POINTER, TYPE_POINTER]):
+        a = stack_pop()
+        b = stack_pop()
+        c = request_slice()
+        d = get_last_index(b) + get_last_index(a) + 1
+        set_slice_last_index(c, d)
+        memory_values[c] = memory_values[b] + memory_values[a]
+        memory_types[c] = memory_types[b] + memory_types[a]
+        stack_push(c, TYPE_POINTER)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_subtract(opcode, offset, more):
+    if precheck([TYPE_NUMBER, TYPE_NUMBER]):
+        a = stack_pop()
+        b = stack_pop()
+        stack_push(b - a, TYPE_NUMBER)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_multiply(opcode, offset, more):
+    if precheck([TYPE_NUMBER, TYPE_NUMBER]):
+        a = stack_pop()
+        b = stack_pop()
+        stack_push(b * a, TYPE_NUMBER)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_divide(opcode, offset, more):
+    if precheck([TYPE_NUMBER, TYPE_NUMBER]):
+        a = stack_pop()
+        b = stack_pop()
+        try:
+            stack_push(float(b / a), TYPE_NUMBER)
+        except:
+            stack_push(float('nan'), TYPE_NUMBER)
+            report('E04: Divide by Zero')
+            abort_run(opcode, offset)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_remainder(opcode, offset, more):
+    if precheck([TYPE_NUMBER, TYPE_NUMBER]):
+        a = stack_pop()
+        b = stack_pop()
+        try:
+            stack_push(float(b % a), TYPE_NUMBER)
+        except:
+            stack_push(float('nan'), TYPE_NUMBER)
+            report('E04: Divide by Zero')
+            abort_run(opcode, offset)
+    else:
+        abort_run(opcode, offset)
+
+
+#def bytecode_floor(opcode, offset, more):
+#    if precheck([TYPE_NUMBER]):
+#        stack_push(math.floor(float(stack_pop())), TYPE_NUMBER)
+#    else:
+#        abort_run(opcode, offset)
+
+
+def bytecode_pow(opcode, offset, more):
+    if precheck([TYPE_NUMBER, TYPE_NUMBER]):
+        a = stack_pop()
+        b = stack_pop()
+        stack_push(math.pow(b, a), TYPE_NUMBER)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_logn(opcode, offset, more):
+    if precheck([TYPE_NUMBER, TYPE_NUMBER]):
+        a = stack_pop()
+        b = stack_pop()
+        stack_push(math.log(b, a), TYPE_NUMBER)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_bitwise_shift(opcode, offset, more):
+    if precheck([TYPE_NUMBER, TYPE_NUMBER]):
+        a = int(stack_pop())
+        b = int(stack_pop())
+        if a < 0:
+            stack_push(b << abs(a), TYPE_NUMBER)
+        else:
+            stack_push(b >> a, TYPE_NUMBER)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_bitwise_and(opcode, offset, more):
+    if precheck([TYPE_NUMBER, TYPE_NUMBER]):
+        a = int(stack_pop())
+        b = int(stack_pop())
+        stack_push(b & a, TYPE_NUMBER)
+    elif precheck([TYPE_FLAG, TYPE_FLAG]):
+        a = int(stack_pop())
+        b = int(stack_pop())
+        stack_push(b & a, TYPE_FLAG)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_bitwise_or(opcode, offset, more):
+    if precheck([TYPE_NUMBER, TYPE_NUMBER]):
+        a = int(stack_pop())
+        b = int(stack_pop())
+        stack_push(b | a, TYPE_NUMBER)
+    elif precheck([TYPE_FLAG, TYPE_FLAG]):
+        a = int(stack_pop())
+        b = int(stack_pop())
+        stack_push(b | a, TYPE_FLAG)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_bitwise_xor(opcode, offset, more):
+    if precheck([TYPE_NUMBER, TYPE_NUMBER]):
+        a = int(stack_pop())
+        b = int(stack_pop())
+        stack_push(b ^ a, TYPE_NUMBER)
+    elif precheck([TYPE_FLAG, TYPE_FLAG]):
+        a = int(stack_pop())
+        b = int(stack_pop())
+        stack_push(b ^ a, TYPE_FLAG)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_random(opcode, offset, more):
+    stack_push(random.SystemRandom().random(), TYPE_NUMBER)
+
+
+def bytecode_sqrt(opcode, offset, more):
+    if precheck([TYPE_NUMBER]):
+        stack_push(math.sqrt(stack_pop()), TYPE_NUMBER)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_round(opcode, offset, more):
+    if precheck([TYPE_NUMBER]):
+        stack_push(round(stack_pop()), TYPE_NUMBER)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_compare_lt(opcode, offset, more):
+    if precheck([TYPE_NUMBER, TYPE_NUMBER]):
+        a = stack_pop()
+        b = stack_pop()
+        if b < a:
+            stack_push(-1, TYPE_FLAG)
+        else:
+            stack_push(0, TYPE_FLAG)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_compare_gt(opcode, offset, more):
+    if precheck([TYPE_NUMBER, TYPE_NUMBER]):
+        a = stack_pop()
+        b = stack_pop()
+        if b > a:
+            stack_push(-1, TYPE_FLAG)
+        else:
+            stack_push(0, TYPE_FLAG)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_compare_lteq(opcode, offset, more):
+    if precheck([TYPE_NUMBER, TYPE_NUMBER]):
+        a = stack_pop()
+        b = stack_pop()
+        if b <= a:
+            stack_push(-1, TYPE_FLAG)
+        else:
+            stack_push(0, TYPE_FLAG)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_compare_gteq(opcode, offset, more):
+    if precheck([TYPE_NUMBER, TYPE_NUMBER]):
+        a = stack_pop()
+        b = stack_pop()
+        if b >= a:
+            stack_push(-1, TYPE_FLAG)
+        else:
+            stack_push(0, TYPE_FLAG)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_compare_eq(opcode, offset, more):
+    if precheck([TYPE_STRING, TYPE_STRING]) or \
+       precheck([TYPE_REMARK, TYPE_REMARK]):
+        a = slice_to_string(stack_pop())
+        b = slice_to_string(stack_pop())
+    elif precheck([TYPE_ANY, TYPE_ANY]):
+        a = stack_pop()
+        b = stack_pop()
+    if b == a:
+        stack_push(-1, TYPE_FLAG)
+    else:
+        stack_push(0, TYPE_FLAG)
+
+
+def bytecode_compare_neq(opcode, offset, more):
+    if precheck([TYPE_STRING, TYPE_STRING]) or \
+       precheck([TYPE_REMARK, TYPE_REMARK]):
+        a = slice_to_string(stack_pop())
+        b = slice_to_string(stack_pop())
+    elif precheck([TYPE_ANY, TYPE_ANY]):
+        a = stack_pop()
+        b = stack_pop()
+    if b != a:
+        stack_push(-1, TYPE_FLAG)
+    else:
+        stack_push(0, TYPE_FLAG)
+
+
+def bytecode_flow_if(opcode, offset, more):
+    if precheck([TYPE_FLAG, TYPE_POINTER, TYPE_POINTER]):
+        a = stack_pop()  # false
+        b = stack_pop()  # true
+        c = stack_pop()  # flag
+        if c == -1:
+            interpret(b, more)
+        else:
+            interpret(a, more)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_flow_while(opcode, offset, more):
+    if precheck([TYPE_POINTER]):
+        quote = stack_pop()
+        a = -1
+        while a == -1:
+            interpret(quote, more)
+            if precheck([TYPE_FLAG]):
+                a = stack_pop()
+            else:
+                if abort_run == False:
+                    abort_run(opcode, offset)
+                a = 0
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_flow_until(opcode, offset, more):
+    if precheck([TYPE_POINTER]):
+        quote = stack_pop()
+        a = 0
+        while a == 0:
+            interpret(quote, more)
+            if precheck([TYPE_FLAG]):
+                a = stack_pop()
+            else:
+                if abort_run == False:
+                    abort_run(opcode, offset)
+                a = -1
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_flow_times(opcode, offset, more):
+    if precheck([TYPE_NUMBER, TYPE_POINTER]):
+        quote = stack_pop()
+        count = stack_pop()
+        while count > 0:
+            interpret(quote, more)
+            count -= 1
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_flow_call(opcode, offset, more):
+    if precheck([TYPE_POINTER]) or precheck([TYPE_FUNCTION_CALL]):
+        a = stack_pop()
+        interpret(a, more)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_flow_dip(opcode, offset, more):
+    if precheck([TYPE_ANY, TYPE_POINTER]):
+        quote = stack_pop()
+        v, t = stack_pop(type = True)
+        interpret(quote, more)
+        stack_push(v, t)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_flow_sip(opcode, offset, more):
+    if precheck([TYPE_ANY, TYPE_POINTER]):
+        quote = stack_pop()
+        stack_dup()
+        v, t = stack_pop(type = True)
+        interpret(quote, more)
+        stack_push(v, t)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_flow_bi(opcode, offset, more):
+    if precheck([TYPE_ANY, TYPE_POINTER, TYPE_POINTER]):
+        a = stack_pop()
+        b = stack_pop()
+        stack_dup()
+        y, x = stack_pop(type = True)
+        interpret(b, more)
+        stack_push(y, x)
+        interpret(a, more)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_flow_tri(opcode, offset, more):
+    if precheck([TYPE_ANY, TYPE_POINTER, TYPE_POINTER, TYPE_POINTER]):
+        a = stack_pop()
+        b = stack_pop()
+        c = stack_pop()
+        stack_dup()
+        y, x = stack_pop(type = True)
+        stack_dup()
+        q, m = stack_pop(type = True)
+        interpret(c, more)
+        stack_push(q, m)
+        interpret(b, more)
+        stack_push(y, x)
+        interpret(a, more)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_flow_abort(opcode, offset, more):
+    global should_abort
+    should_abort = True
+
+
+def bytecode_mem_copy(opcode, offset, more):
+    if precheck([TYPE_POINTER, TYPE_POINTER]):
+        a = stack_pop()
+        b = stack_pop()
+        copy_slice(b, a)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_mem_fetch(opcode, offset, more):
+    if precheck([TYPE_ANY_PTR, TYPE_NUMBER]):
+        a = stack_pop()     # offset
+        b = stack_pop()     # slice
+        if a == float('nan'):
+            abort_run(opcode, offset)
+        else:
+            v, t = fetch(b, a)
+            stack_push(v, t)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_mem_store(opcode, offset, more):
+    if precheck([TYPE_ANY, TYPE_ANY_PTR, TYPE_NUMBER]):
+        a = stack_pop()     # offset
+        b = stack_pop()     # slice
+        c, t = stack_pop(type = True)   # value
+        if a == float('nan'):
+            abort_run(opcode, offset)
+        else:
+            store(c, b, a, t)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_mem_request(opcode, offset, more):
+    stack_push(request_slice(), TYPE_POINTER)
+
+
+def bytecode_mem_release(opcode, offset, more):
+    if precheck([TYPE_POINTER]):
+        release_slice(stack_pop())
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_mem_collect(opcode, offset, more):
+    collect_garbage()
+
+
+def bytecode_mem_get_last(opcode, offset, more):
+    if precheck([TYPE_POINTER]) or \
+       precheck([TYPE_STRING]) or \
+       precheck([TYPE_REMARK]):
+        a = stack_pop()
+        stack_push(get_last_index(a), TYPE_NUMBER)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_mem_set_last(opcode, offset, more):
+    if precheck([TYPE_NUMBER, TYPE_POINTER]):
+        a = stack_pop()
+        b = stack_pop()
+        set_slice_last_index(a, b)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_mem_set_type(opcode, offset, more):
+    if precheck([TYPE_NUMBER, TYPE_POINTER, TYPE_NUMBER]):
+        a = stack_pop()  # offset
+        b = stack_pop()  # slice
+        c = stack_pop()  # type
+        store_type(b, a, c)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_mem_get_type(opcode, offset, more):
+    if precheck([TYPE_POINTER, TYPE_NUMBER]):
+        a = stack_pop()
+        b = stack_pop()
+        v, t = fetch(b, a)
+        stack_push(int(t), TYPE_NUMBER)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_stack_dup(opcode, offset, more):
+    if precheck([TYPE_ANY]):
+        stack_dup()
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_stack_drop(opcode, offset, more):
+    if precheck([TYPE_ANY]):
+        stack_drop()
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_stack_swap(opcode, offset, more):
+    if precheck([TYPE_ANY, TYPE_ANY]):
+        stack_swap()
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_stack_depth(opcode, offset, more):
+    stack_push(len(stack), TYPE_NUMBER)
+
+
+def bytecode_quote_name(opcode, offset, more):
+    if precheck([TYPE_ANY_PTR, TYPE_STRING]):
+        name = slice_to_string(stack_pop())
+        ptr = stack_pop()
+        add_definition(name, ptr)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_function_hide(opcode, offset, more):
+    if precheck([TYPE_STRING]):
+        name = slice_to_string(stack_pop())
+        if lookup_pointer(name) != -1:
+            remove_name(name)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_string_seek(opcode, offset, more):
+    if precheck([TYPE_STRING, TYPE_STRING]):
+        a = slice_to_string(stack_pop())
+        b = slice_to_string(stack_pop())
+        stack_push(b.find(a), TYPE_NUMBER)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_slice_subslice(opcode, offset, more):
+    if precheck([TYPE_POINTER, TYPE_NUMBER, TYPE_NUMBER]) or \
+       precheck([TYPE_STRING, TYPE_NUMBER, TYPE_NUMBER]) or \
+       precheck([TYPE_REMARK, TYPE_NUMBER, TYPE_NUMBER]):
+        a = int(stack_pop())
+        b = int(stack_pop())
+        s = int(stack_pop())
+        c = memory_values[s]
+        d = c[b:a]
+        dt = memory_types[s]
+        dt = dt[b:a]
+        e = request_slice()
+        i = 0
+        while i < len(d):
+            store(d[i], e, i, dt[i])
+            i = i + 1
+        stack_push(e, TYPE_POINTER)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_string_numeric(opcode, offset, more):
+    if precheck([TYPE_STRING]):
+        a = slice_to_string(stack_pop())
+        if is_number(a):
+            stack_push(-1, TYPE_FLAG)
+        else:
+            stack_push(0, TYPE_FLAG)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_slice_reverse(opcode, offset, more):
+    if precheck([TYPE_POINTER]) or \
+       precheck([TYPE_STRING]) or \
+       precheck([TYPE_REMARK]):
+        a = stack_pop()
+        memory_values[int(a)] = memory_values[int(a)][::-1]
+        memory_types[int(a)] = memory_types[int(a)][::-1]
+        stack_push(a, TYPE_POINTER)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_to_upper(opcode, offset, more):
+    if precheck([TYPE_STRING]):
+        ptr = stack_pop()
+        a = slice_to_string(ptr).upper()
+        stack_push(string_to_slice(a), TYPE_STRING)
+    elif precheck([TYPE_CHARACTER]):
+        a = stack_pop()
+        if a >= 32 and a <= 128:
+            b = ''.join(chr(a))
+            a = b.upper()
+            stack_push(ord(a[0].encode('utf-8')), TYPE_CHARACTER)
+        else:
+            report('CHARACTER not in valid range (32 .. 128)')
+            abort_run(opcode, offset)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_to_lower(opcode, offset, more):
+    if precheck([TYPE_STRING]):
+        ptr = stack_pop()
+        a = slice_to_string(ptr).lower()
+        stack_push(string_to_slice(a), TYPE_STRING)
+    elif precheck([TYPE_CHARACTER]):
+        a = stack_pop()
+        if a >= 32 and a <= 128:
+            b = ''.join(chr(a))
+            a = b.lower()
+            stack_push(ord(a[0].encode('utf-8')), TYPE_CHARACTER)
+        else:
+            report('CHARACTER not in valid range (32 .. 128)')
+            abort_run(opcode, offset)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_report(opcode, offset, more):
+    if precheck([TYPE_STRING]):
+        report(slice_to_string(stack_pop()))
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_vm_names(opcode, offset, more):
+    s = request_slice()
+    i = 0
+    for word in dictionary_names:
+        value = string_to_slice(word)
+        store(value, s, i, TYPE_STRING)
+        i = i + 1
+    stack_push(s, TYPE_POINTER)
+
+
+def bytecode_vm_slices(opcode, offset, more):
+    s = request_slice()
+    i = 0
+    for ptr in dictionary_slices:
+        store(ptr, s, i, TYPE_POINTER)
+        i = i + 1
+    stack_push(s, TYPE_POINTER)
+
+
+def bytecode_trig_sin(opcode, offset, more):
+    if precheck([TYPE_NUMBER]):
+        a = stack_pop()
+        stack_push(math.sin(a), TYPE_NUMBER)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_trig_cos(opcode, offset, more):
+    if precheck([TYPE_NUMBER]):
+        a = stack_pop()
+        stack_push(math.cos(a), TYPE_NUMBER)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_trig_tan(opcode, offset, more):
+    if precheck([TYPE_NUMBER]):
+        a = stack_pop()
+        stack_push(math.tan(a), TYPE_NUMBER)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_trig_asin(opcode, offset, more):
+    if precheck([TYPE_NUMBER]):
+        a = stack_pop()
+        stack_push(math.asin(a), TYPE_NUMBER)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_trig_acos(opcode, offset, more):
+    if precheck([TYPE_NUMBER]):
+        a = stack_pop()
+        stack_push(math.acos(a), TYPE_NUMBER)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_trig_atan(opcode, offset, more):
+    if precheck([TYPE_NUMBER]):
+        a = stack_pop()
+        stack_push(math.atan(a), TYPE_NUMBER)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_trig_atan2(opcode, offset, more):
+    if precheck([TYPE_NUMBER, TYPE_NUMBER]):
+        a = stack_pop()
+        b = stack_pop()
+        stack_push(math.atan2(b, a), TYPE_NUMBER)
+    else:
+        abort_run(opcode, offset)
+
+
+def bytecode_vm_mem_map(opcode, offset, more):
+    s = request_slice()
+    i = 0
+    for a in memory_map:
+        store(a, s, i, TYPE_NUMBER)
+        i = i + 1
+    stack_push(s, TYPE_POINTER)
+
+
+def bytecode_vm_mem_sizes(opcode, offset, more):
+    s = request_slice()
+    i = 0
+    for a in memory_size:
+        store(a, s, i, TYPE_NUMBER)
+        i = i + 1
+    stack_push(s, TYPE_POINTER)
+
+
+def bytecode_vm_mem_alloc(opcode, offset, more):
+    s = request_slice()
+    i = 0
+    n = 0
+    while i < len(memory_map):
+        if memory_map[i] == 1:
+            store(i, s, n, TYPE_POINTER)
+            n = n + 1
+        i = i + 1
+    stack_push(s, TYPE_POINTER)
+
+
+# Create the dispatch table mapping byte code numbers to their implementations
+
+bytecodes = {
+    BC_NOP:            bytecode_nop,
+    BC_SET_TYPE:       bytecode_set_type,
+    BC_GET_TYPE:       bytecode_get_type,
+    BC_ADD:            bytecode_add,
+    BC_SUBTRACT:       bytecode_subtract,
+    BC_MULTIPLY:       bytecode_multiply,
+    BC_DIVIDE:         bytecode_divide,
+    BC_REMAINDER:      bytecode_remainder,
+    BC_POW:            bytecode_pow,
+    BC_LOGN:           bytecode_logn,
+    BC_BITWISE_SHIFT:  bytecode_bitwise_shift,
+    BC_BITWISE_AND:    bytecode_bitwise_and,
+    BC_BITWISE_OR:     bytecode_bitwise_or,
+    BC_BITWISE_XOR:    bytecode_bitwise_xor,
+    BC_RANDOM:         bytecode_random,
+    BC_SQRT:           bytecode_sqrt,
+    BC_ROUND:          bytecode_round,
+    BC_COMPARE_LT:     bytecode_compare_lt,
+    BC_COMPARE_GT:     bytecode_compare_gt,
+    BC_COMPARE_LTEQ:   bytecode_compare_lteq,
+    BC_COMPARE_GTEQ:   bytecode_compare_gteq,
+    BC_COMPARE_EQ:     bytecode_compare_eq,
+    BC_COMPARE_NEQ:    bytecode_compare_neq,
+    BC_FLOW_IF:        bytecode_flow_if,
+    BC_FLOW_WHILE:     bytecode_flow_while,
+    BC_FLOW_UNTIL:     bytecode_flow_until,
+    BC_FLOW_TIMES:     bytecode_flow_times,
+    BC_FLOW_CALL:      bytecode_flow_call,
+    BC_FLOW_DIP:       bytecode_flow_dip,
+    BC_FLOW_SIP:       bytecode_flow_sip,
+    BC_FLOW_BI:        bytecode_flow_bi,
+    BC_FLOW_TRI:       bytecode_flow_tri,
+    BC_FLOW_ABORT:     bytecode_flow_abort,
+    BC_MEM_COPY:       bytecode_mem_copy,
+    BC_MEM_FETCH:      bytecode_mem_fetch,
+    BC_MEM_STORE:      bytecode_mem_store,
+    BC_MEM_REQUEST:    bytecode_mem_request,
+    BC_MEM_RELEASE:    bytecode_mem_release,
+    BC_MEM_COLLECT:    bytecode_mem_collect,
+    BC_MEM_GET_LAST:   bytecode_mem_get_last,
+    BC_MEM_SET_LAST:   bytecode_mem_set_last,
+    BC_MEM_SET_TYPE:   bytecode_mem_set_type,
+    BC_MEM_GET_TYPE:   bytecode_mem_get_type,
+    BC_STACK_DUP:      bytecode_stack_dup,
+    BC_STACK_DROP:     bytecode_stack_drop,
+    BC_STACK_SWAP:     bytecode_stack_swap,
+    BC_STACK_DEPTH:    bytecode_stack_depth,
+    BC_QUOTE_NAME:     bytecode_quote_name,
+    BC_FUNCTION_HIDE:  bytecode_function_hide,
+    BC_STRING_SEEK:    bytecode_string_seek,
+    BC_SLICE_SUBSLICE: bytecode_slice_subslice,
+    BC_STRING_NUMERIC: bytecode_string_numeric,
+    BC_SLICE_REVERSE:  bytecode_slice_reverse,
+    BC_TO_LOWER:       bytecode_to_lower,
+    BC_TO_UPPER:       bytecode_to_upper,
+    BC_REPORT:         bytecode_report,
+    BC_VM_NAMES:       bytecode_vm_names,
+    BC_VM_SLICES:      bytecode_vm_slices,
+    BC_TRIG_SIN:       bytecode_trig_sin,
+    BC_TRIG_COS:       bytecode_trig_cos,
+    BC_TRIG_TAN:       bytecode_trig_tan,
+    BC_TRIG_ASIN:      bytecode_trig_asin,
+    BC_TRIG_ACOS:      bytecode_trig_acos,
+    BC_TRIG_ATAN:      bytecode_trig_atan,
+    BC_TRIG_ATAN2:     bytecode_trig_atan2,
+    BC_VM_MEM_MAP:     bytecode_vm_mem_map,
+    BC_VM_MEM_SIZES:   bytecode_vm_mem_sizes,
+    BC_VM_MEM_ALLOC:   bytecode_vm_mem_alloc,
+}
+
+# -+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+# Error logging
+
+# Errors are stored in an array, with a couple of helper functions to record
+# and clear them.
 #
-# errors are stored in an array, with helper functions to
-# record and clear them
-#
+# The interface layer should provide access to the the log (displaying when
+# appropriate).
 
 errors = []
 
@@ -163,27 +967,58 @@ def report(text):
     global errors
     errors.append(text)
 
+# -+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 
-def check_depth(slice, offset, cells):
-    """returns True if the stack has at least *cells* number of items, or"""
-    """False otherwise. If False, reports an underflow error."""
-    global stack
-    if len(stack) < cells:
-        details = 'Slice ' + str(slice) + ' Offset: ' + str(offset)
-        expected = str(cells) + ' values required'
-        report('E01: Stack underflow: ' + details + ': ' + expected)
-        return False
-    else:
-        return True
-
-
+# Byte Code Interpreter
 #
-# Byte code interpreter
+# This is the heart of the virtual machine: it's responsible for actually
+# running the code stored in a slice.
+
+
+current_slice = 0           # This is set by interpret() to the slice being run
+                            # It's used for error reports, and as a guard to
+                            # prevent garbage collection of a slice being run.
+
+should_abort = False        # Used to indicate if an error was detected during
+                            # the current run.
+
+
+def abort_run(opcode, offset):
+    global should_abort
+    emsg = "E__: "
+    emsg = emsg + "Error processing `" + str(opcode) + " "
+    emsg = emsg + "at offset " + str(offset) + " in slice "
+    emsg = emsg + str(current_slice)
+    report(emsg)
+    should_abort = True
+
+
+def precheck(req):
+    flag = True
+    if len(stack) < len(req):
+        flag = False
+    i = len(stack) - 1
+    if flag:
+        for t in reversed(req):
+            if t == TYPE_ANY_PTR:
+                if types[i] != TYPE_POINTER and \
+                   types[i] != TYPE_STRING and \
+                   types[i] != TYPE_REMARK and \
+                   types[i] != TYPE_FUNCTION_CALL:
+                    flag = False
+            elif t != types[i] and t != TYPE_ANY:
+                flag = False
+            i = i - 1
+    return flag
+
+
+# The interpret() function handles:
 #
-
-current_slice = 0
-should_abort = False
-
+# - pushing values to the stack (based on stored type)
+# - invoking the handler for each byte code
+# - the BC_FLOW_RETURN instruction (which jumps to the end of the slice,
+#   halting execution).
+# - sets / clears the **current_slice** variable
 
 def interpret(slice, more=None):
     """Interpret the byte codes contained in a slice."""
@@ -194,9 +1029,7 @@ def interpret(slice, more=None):
     if current_slice == 0:
         current_slice = slice
     while offset <= size and should_abort is not True:
-        opcode = fetch(slice, offset)
-        optype = fetch_type(slice, offset)
-
+        opcode, optype = fetch(slice, offset)
         if optype != TYPE_BYTECODE:
             stack_push(opcode, optype)
             if optype == TYPE_REMARK:
@@ -204,629 +1037,32 @@ def interpret(slice, more=None):
             if optype == TYPE_FUNCTION_CALL:
                 interpret(stack_pop(), more)
         else:
-            if opcode == BC_SET_TYPE:
-                if check_depth(slice, offset, 2):
-                    a = stack_pop()
-                    stack_change_type(a)
-                else:
-                    offset = size
-            elif opcode == BC_GET_TYPE:
-                if check_depth(slice, offset, 1):
-                    stack_push(stack_type(), TYPE_NUMBER)
-                else:
-                    offset = size
-            elif opcode == BC_ADD:
-                if check_depth(slice, offset, 2):
-                    x = stack_type()
-                    a = stack_pop()
-                    y = stack_type()
-                    b = stack_pop()
-                    if x == TYPE_STRING and y == TYPE_STRING:
-                        a = slice_to_string(a)
-                        b = slice_to_string(b)
-                        stack_push(string_to_slice(b + a), TYPE_STRING)
-                    elif x == TYPE_REMARK and y == TYPE_REMARK:
-                        a = slice_to_string(a)
-                        b = slice_to_string(b)
-                        stack_push(string_to_slice(b + a), TYPE_REMARK)
-                    elif x == TYPE_POINTER and y == TYPE_POINTER:
-                        c = request_slice()
-                        d = get_last_index(b) + get_last_index(a) + 1
-                        set_slice_last_index(c, d)
-                        memory_values[c] = memory_values[b] + memory_values[a]
-                        memory_types[c] = memory_types[b] + memory_types[a]
-                        stack_push(c, TYPE_POINTER)
-                    else:
-                        stack_push(a + b, TYPE_NUMBER)
-                else:
-                    offset = size
-            elif opcode == BC_SUBTRACT:
-                if check_depth(slice, offset, 2):
-                    a = stack_pop()
-                    b = stack_pop()
-                    stack_push(b - a, TYPE_NUMBER)
-                else:
-                    offset = size
-            elif opcode == BC_MULTIPLY:
-                if check_depth(slice, offset, 2):
-                    a = stack_pop()
-                    b = stack_pop()
-                    stack_push(a * b, TYPE_NUMBER)
-                else:
-                    offset = size
-            elif opcode == BC_DIVIDE:
-                if check_depth(slice, offset, 2):
-                    a = stack_pop()
-                    b = stack_pop()
-                    if a == 0 or b == 0:
-                        stack_push(float('nan'), TYPE_NUMBER)
-                        report('E04: Divide by Zero')
-                    else:
-                        stack_push(b / a, TYPE_NUMBER)
-                else:
-                    offset = size
-            elif opcode == BC_REMAINDER:
-                if check_depth(slice, offset, 2):
-                    a = stack_pop()
-                    b = stack_pop()
-                    stack_push(b % a, TYPE_NUMBER)
-                else:
-                    offset = size
-            elif opcode == BC_FLOOR:
-                if check_depth(slice, offset, 1):
-                    stack_push(math.floor(float(stack_pop())), TYPE_NUMBER)
-                else:
-                    offset = size
-            elif opcode == BC_POW:
-                if check_depth(slice, offset, 2):
-                    a = stack_pop()
-                    b = stack_pop()
-                    stack_push(math.pow(b, a), TYPE_NUMBER)
-                else:
-                    offset = size
-            elif opcode == BC_LOG:
-                if check_depth(slice, offset, 1):
-                    a = stack_pop()
-                    stack_push(math.log(a), TYPE_NUMBER)
-                else:
-                    offset = size
-            elif opcode == BC_LOG10:
-                if check_depth(slice, offset, 1):
-                    a = stack_pop()
-                    stack_push(math.log10(a), TYPE_NUMBER)
-                else:
-                    offset = size
-            elif opcode == BC_LOGN:
-                if check_depth(slice, offset, 2):
-                    a = stack_pop()
-                    b = stack_pop()
-                    stack_push(math.log(b, a), TYPE_NUMBER)
-                else:
-                    offset = size
-            elif opcode == BC_BITWISE_SHIFT:
-                if check_depth(slice, offset, 2):
-                    a = int(stack_pop())
-                    b = int(stack_pop())
-                    if a < 0:
-                        stack_push(b << abs(a), TYPE_NUMBER)
-                    else:
-                        stack_push(b >> a, TYPE_NUMBER)
-                else:
-                    offset = size
-            elif opcode == BC_BITWISE_AND:
-                if check_depth(slice, offset, 2):
-                    a = int(stack_pop())
-                    b = int(stack_pop())
-                    stack_push(b & a, TYPE_NUMBER)
-                else:
-                    offset = size
-            elif opcode == BC_BITWISE_OR:
-                if check_depth(slice, offset, 2):
-                    a = int(stack_pop())
-                    b = int(stack_pop())
-                    stack_push(b | a, TYPE_NUMBER)
-                else:
-                    offset = size
-            elif opcode == BC_BITWISE_XOR:
-                if check_depth(slice, offset, 2):
-                    a = int(stack_pop())
-                    b = int(stack_pop())
-                    stack_push(b ^ a, TYPE_NUMBER)
-                else:
-                    offset = size
-            elif opcode == BC_RANDOM:
-                stack_push(random.SystemRandom().random(), TYPE_NUMBER)
-            elif opcode == BC_SQRT:
-                if check_depth(slice, offset, 1):
-                    stack_push(math.sqrt(stack_pop()), TYPE_NUMBER)
-                else:
-                    offset = size
-            elif opcode == BC_ROUND:
-                if check_depth(slice, offset, 1):
-                    stack_push(round(stack_pop()), TYPE_NUMBER)
-                else:
-                    offset = size
-            elif opcode == BC_COMPARE_LT:
-                if check_depth(slice, offset, 2):
-                    x = stack_type()
-                    a = stack_pop()
-                    y = stack_type()
-                    b = stack_pop()
-                    if x == TYPE_NUMBER and y == TYPE_NUMBER:
-                        if b < a:
-                            stack_push(-1, TYPE_FLAG)
-                        else:
-                            stack_push(0, TYPE_FLAG)
-                    else:
-                        offset = size
-                        details = 'Slice ' + str(slice)
-                        details = details + ' Offset: ' + str(offset)
-                        report('E02: Type mismatch: ' + details)
-                else:
-                    offset = size
-            elif opcode == BC_COMPARE_GT:
-                if check_depth(slice, offset, 2):
-                    x = stack_type()
-                    a = stack_pop()
-                    y = stack_type()
-                    b = stack_pop()
-                    if x == TYPE_NUMBER and y == TYPE_NUMBER:
-                        if b > a:
-                            stack_push(-1, TYPE_FLAG)
-                        else:
-                            stack_push(0, TYPE_FLAG)
-                    else:
-                        offset = size
-                        details = 'Slice ' + str(slice)
-                        details = details + ' Offset: ' + str(offset)
-                        report('E02: Type mismatch: ' + details)
-                else:
-                    offset = size
-            elif opcode == BC_COMPARE_LTEQ:
-                if check_depth(slice, offset, 2):
-                    x = stack_type()
-                    a = stack_pop()
-                    y = stack_type()
-                    b = stack_pop()
-                    if x == TYPE_NUMBER and y == TYPE_NUMBER:
-                        if b <= a:
-                            stack_push(-1, TYPE_FLAG)
-                        else:
-                            stack_push(0, TYPE_FLAG)
-                    else:
-                        offset = size
-                        details = 'Slice ' + str(slice)
-                        details = details + ' Offset: ' + str(offset)
-                        report('E02: Type mismatch: ' + details)
-                else:
-                    offset = size
-            elif opcode == BC_COMPARE_GTEQ:
-                if check_depth(slice, offset, 2):
-                    x = stack_type()
-                    a = stack_pop()
-                    y = stack_type()
-                    b = stack_pop()
-                    if x == TYPE_NUMBER and y == TYPE_NUMBER:
-                        if b >= a:
-                            stack_push(-1, TYPE_FLAG)
-                        else:
-                            stack_push(0, TYPE_FLAG)
-                    else:
-                        offset = size
-                        details = 'Slice ' + str(slice)
-                        details = details + ' Offset: ' + str(offset)
-                        report('E02: Type mismatch: ' + details)
-                else:
-                    offset = size
-            elif opcode == BC_COMPARE_EQ:
-                if check_depth(slice, offset, 2):
-                    x = stack_type()
-                    a = stack_pop()
-                    y = stack_type()
-                    b = stack_pop()
-                    if x == y and x != TYPE_STRING:
-                        if b == a:
-                            stack_push(-1, TYPE_FLAG)
-                        else:
-                            stack_push(0, TYPE_FLAG)
-                    elif x == y and x == TYPE_STRING:
-                        if slice_to_string(b) == slice_to_string(a):
-                            stack_push(-1, TYPE_FLAG)
-                        else:
-                            stack_push(0, TYPE_FLAG)
-                    else:
-                        offset = size
-                        details = 'Slice ' + str(slice)
-                        details = details + ' Offset: ' + str(offset)
-                        report('E02: Type mismatch: ' + details)
-                else:
-                    offset = size
-            elif opcode == BC_COMPARE_NEQ:
-                if check_depth(slice, offset, 2):
-                    x = stack_type()
-                    a = stack_pop()
-                    y = stack_type()
-                    b = stack_pop()
-                    if x == y and x != TYPE_STRING:
-                        if b != a:
-                            stack_push(-1, TYPE_FLAG)
-                        else:
-                            stack_push(0, TYPE_FLAG)
-                    elif x == y and x == TYPE_STRING:
-                        if slice_to_string(b) != slice_to_string(a):
-                            stack_push(-1, TYPE_FLAG)
-                        else:
-                            stack_push(0, TYPE_FLAG)
-                    else:
-                        offset = size
-                        details = 'Slice ' + str(slice)
-                        details = details + ' Offset: ' + str(offset)
-                        report('E02: Type mismatch: ' + details)
-                else:
-                    offset = size
-            elif opcode == BC_FLOW_IF:
-                if check_depth(slice, offset, 3):
-                    a = stack_pop()  # false
-                    b = stack_pop()  # true
-                    c = stack_pop()  # flag
-                    if c == -1:
-                        interpret(b, more)
-                    else:
-                        interpret(a, more)
-                else:
-                    offset = size
-            elif opcode == BC_FLOW_WHILE:
-                if check_depth(slice, offset, 1):
-                    quote = stack_pop()
-                    a = -1
-                    while a == -1:
-                        interpret(quote, more)
-                        a = stack_pop()
-                else:
-                    offset = size
-            elif opcode == BC_FLOW_UNTIL:
-                if check_depth(slice, offset, 1):
-                    quote = stack_pop()
-                    a = 0
-                    while a == 0:
-                        interpret(quote, more)
-                        a = stack_pop()
-                else:
-                    offset = size
-            elif opcode == BC_FLOW_TIMES:
-                if check_depth(slice, offset, 2):
-                    quote = stack_pop()
-                    count = stack_pop()
-                    while count > 0:
-                        interpret(quote, more)
-                        count -= 1
-                else:
-                    offset = size
-            elif opcode == BC_FLOW_CALL:
-                offset += 1
-                interpret(int(fetch(slice, offset)), more)
-            elif opcode == BC_FLOW_CALL_F:
-                if check_depth(slice, offset, 1):
-                    a = stack_pop()
-                    interpret(a, more)
-                else:
-                    offset = size
-            elif opcode == BC_FLOW_DIP:
-                if check_depth(slice, offset, 2):
-                    quote = stack_pop()
-                    vtype = stack_type()
-                    value = stack_pop()
-                    interpret(quote, more)
-                    stack_push(value, vtype)
-                else:
-                    offset = size
-            elif opcode == BC_FLOW_SIP:
-                if check_depth(slice, offset, 2):
-                    quote = stack_pop()
-                    stack_dup()
-                    vtype = stack_type()
-                    value = stack_pop()
-                    interpret(quote, more)
-                    stack_push(value, vtype)
-                else:
-                    offset = size
-            elif opcode == BC_FLOW_BI:
-                if check_depth(slice, offset, 3):
-                    a = stack_pop()
-                    b = stack_pop()
-                    stack_dup()
-                    x = stack_type()
-                    y = stack_pop()
-                    interpret(b, more)
-                    stack_push(y, x)
-                    interpret(a, more)
-                else:
-                    offset = size
-            elif opcode == BC_FLOW_TRI:
-                if check_depth(slice, offset, 4):
-                    a = stack_pop()
-                    b = stack_pop()
-                    c = stack_pop()
-                    stack_dup()
-                    x = stack_type()
-                    y = stack_pop()
-                    stack_dup()
-                    m = stack_type()
-                    q = stack_pop()
-                    interpret(c, more)
-                    stack_push(q, m)
-                    interpret(b, more)
-                    stack_push(y, x)
-                    interpret(a, more)
-                else:
-                    offset = size
-            elif opcode == BC_FLOW_ABORT:
-                should_abort = True
+            if opcode in bytecodes:
+                bytecodes[opcode](opcode, offset, more)
             elif opcode == BC_FLOW_RETURN:
                 offset = size
-            elif opcode == BC_MEM_COPY:
-                if check_depth(slice, offset, 2):
-                    a = stack_pop()
-                    b = stack_pop()
-                    copy_slice(b, a)
-                else:
-                    offset = size
-            elif opcode == BC_MEM_FETCH:
-                if check_depth(slice, offset, 2):
-                    a = stack_pop()
-                    b = stack_pop()
-                    stack_push(fetch(b, a), fetch_type(b, a))
-                else:
-                    offset = size
-            elif opcode == BC_MEM_STORE:
-                if check_depth(slice, offset, 3):
-                    a = stack_pop()   # offset
-                    b = stack_pop()   # slice
-                    t = stack_type()  # type
-                    c = stack_pop()   # value
-                    store(c, b, a, t)
-                else:
-                    offset = size
-            elif opcode == BC_MEM_REQUEST:
-                stack_push(request_slice(), TYPE_POINTER)
-            elif opcode == BC_MEM_RELEASE:
-                if check_depth(slice, offset, 1):
-                    release_slice(stack_pop())
-                else:
-                    offset = size
-            elif opcode == BC_MEM_COLLECT:
-                collect_garbage()
-            elif opcode == BC_MEM_GET_LAST:
-                if check_depth(slice, offset, 1):
-                    a = stack_pop()
-                    stack_push(get_last_index(a), TYPE_NUMBER)
-                else:
-                    offset = size
-            elif opcode == BC_MEM_SET_LAST:
-                if check_depth(slice, offset, 2):
-                    a = stack_pop()
-                    b = stack_pop()
-                    set_slice_last_index(a, b)
-                else:
-                    offset = size
-            elif opcode == BC_MEM_SET_TYPE:
-                if check_depth(slice, offset, 3):
-                    a = stack_pop()  # offset
-                    b = stack_pop()  # slice
-                    c = stack_pop()  # type
-                    store_type(b, a, c)
-                else:
-                    offset = size
-            elif opcode == BC_MEM_GET_TYPE:
-                if check_depth(slice, offset, 1):
-                    a = stack_pop()
-                    b = stack_pop()
-                    c = fetch_type(b, a)
-                    stack_push(int(c), TYPE_NUMBER)
-                else:
-                    offset = size
-            elif opcode == BC_STACK_DUP:
-                if check_depth(slice, offset, 1):
-                    stack_dup()
-                else:
-                    offset = size
-            elif opcode == BC_STACK_DROP:
-                if check_depth(slice, offset, 1):
-                    stack_drop()
-                else:
-                    offset = size
-            elif opcode == BC_STACK_SWAP:
-                if check_depth(slice, offset, 2):
-                    stack_swap()
-                else:
-                    offset = size
-            elif opcode == BC_STACK_DEPTH:
-                stack_push(len(stack), TYPE_NUMBER)
-            elif opcode == BC_QUOTE_NAME:
-                if check_depth(slice, offset, 2):
-                    name = slice_to_string(stack_pop())
-                    ptr = stack_pop()
-                    add_definition(name, ptr)
-                else:
-                    offset = size
-            elif opcode == BC_FUNCTION_EXISTS:
-                if check_depth(slice, offset, 1):
-                    name = slice_to_string(stack_pop())
-                    if lookup_pointer(name) != -1:
-                        stack_push(-1, TYPE_FLAG)
-                    else:
-                        stack_push(0, TYPE_FLAG)
-                else:
-                    offset = size
-            elif opcode == BC_FUNCTION_LOOKUP:
-                if check_depth(slice, offset, 1):
-                    name = slice_to_string(stack_pop())
-                    if lookup_pointer(name) != -1:
-                        stack_push(lookup_pointer(name), TYPE_POINTER)
-                    else:
-                        stack_push(-1, TYPE_POINTER)
-                else:
-                    offset = size
-            elif opcode == BC_FUNCTION_HIDE:
-                if check_depth(slice, offset, 1):
-                    name = slice_to_string(stack_pop())
-                    if lookup_pointer(name) != -1:
-                        remove_name(name)
-                else:
-                    offset = size
-            elif opcode == BC_FUNCTION_NAME:
-                if check_depth(slice, offset, 1):
-                    a = pointer_to_name(stack_pop())
-                    stack_push(string_to_slice(a), TYPE_STRING)
-                else:
-                    offset = size
-            elif opcode == BC_STRING_SEEK:
-                if check_depth(slice, offset, 2):
-                    a = slice_to_string(stack_pop())
-                    b = slice_to_string(stack_pop())
-                    stack_push(b.find(a), TYPE_NUMBER)
-                else:
-                    offset = size
-            elif opcode == BC_SLICE_SUBSLICE:
-                if check_depth(slice, offset, 3):
-                    a = int(stack_pop())
-                    b = int(stack_pop())
-                    s = int(stack_pop())
-                    c = memory_values[s]
-                    d = c[b:a]
-                    dt = memory_types[s]
-                    dt = dt[b:a]
-                    e = request_slice()
-                    i = 0
-                    while i < len(d):
-                        store(d[i], e, i, dt[i])
-                        i = i + 1
-                    stack_push(e, TYPE_POINTER)
-                else:
-                    offset = size
-            elif opcode == BC_STRING_NUMERIC:
-                if check_depth(slice, offset, 1):
-                    a = slice_to_string(stack_pop())
-                    if is_number(a):
-                        stack_push(-1, TYPE_FLAG)
-                    else:
-                        stack_push(0, TYPE_FLAG)
-                else:
-                    offset = size
-            elif opcode == BC_SLICE_REVERSE:
-                if check_depth(slice, offset, 1):
-                    a = stack_pop()
-                    memory_values[int(a)] = memory_values[int(a)][::-1]
-                    stack_push(a, TYPE_POINTER)
-                else:
-                    offset = size
-            elif opcode == BC_TO_UPPER:
-                if check_depth(slice, offset, 1):
-                    t = stack_type()
-                    if t == TYPE_STRING:
-                        ptr = stack_pop()
-                        a = slice_to_string(ptr).upper()
-                        stack_push(string_to_slice(a), TYPE_STRING)
-                    elif t == TYPE_CHARACTER:
-                        a = stack_pop()
-                        b = ''.join(chr(a))
-                        a = b.upper()
-                        stack_push(ord(a[0].encode('utf-8')), TYPE_CHARACTER)
-                    else:
-                        details = 'Slice ' + str(slice)
-                        details = details + ' Offset: ' + str(offset)
-                        report('E02: Type mismatch: ' + details)
-                else:
-                    offset = size
-            elif opcode == BC_TO_LOWER:
-                if check_depth(slice, offset, 1):
-                    t = stack_type()
-                    if t == TYPE_STRING:
-                        ptr = stack_pop()
-                        a = slice_to_string(ptr).lower()
-                        stack_push(string_to_slice(a), TYPE_STRING)
-                    elif t == TYPE_CHARACTER:
-                        a = stack_pop()
-                        b = ''.join(chr(a))
-                        a = b.lower()
-                        stack_push(ord(a[0].encode('utf-8')), TYPE_CHARACTER)
-                    else:
-                        details = 'Slice ' + str(slice)
-                        details = details + ' Offset: ' + str(offset)
-                        report('E02: Type mismatch: ' + details)
-                else:
-                    offset = size
-            elif opcode == BC_REPORT:
-                if check_depth(slice, offset, 1):
-                    if stack_type() == TYPE_STRING:
-                        a = slice_to_string(stack_pop())
-                        report(a)
-                offset = size
-            elif opcode == BC_TRIG_SIN:
-                if check_depth(slice, offset, 1):
-                    a = stack_pop()
-                    stack_push(math.sin(a), TYPE_NUMBER)
-                else:
-                    offset = size
-            elif opcode == BC_TRIG_COS:
-                if check_depth(slice, offset, 1):
-                    a = stack_pop()
-                    stack_push(math.cos(a), TYPE_NUMBER)
-                else:
-                    offset = size
-            elif opcode == BC_TRIG_TAN:
-                if check_depth(slice, offset, 1):
-                    a = stack_pop()
-                    stack_push(math.tan(a), TYPE_NUMBER)
-                else:
-                    offset = size
-            elif opcode == BC_TRIG_ASIN:
-                if check_depth(slice, offset, 1):
-                    a = stack_pop()
-                    stack_push(math.asin(a), TYPE_NUMBER)
-                else:
-                    offset = size
-            elif opcode == BC_TRIG_ACOS:
-                if check_depth(slice, offset, 1):
-                    a = stack_pop()
-                    stack_push(math.acos(a), TYPE_NUMBER)
-                else:
-                    offset = size
-            elif opcode == BC_TRIG_ATAN:
-                if check_depth(slice, offset, 1):
-                    a = stack_pop()
-                    stack_push(math.atan(a), TYPE_NUMBER)
-                else:
-                    offset = size
-            elif opcode == BC_TRIG_ATAN2:
-                if check_depth(slice, offset, 2):
-                    a = stack_pop()
-                    b = stack_pop()
-                    stack_push(math.atan2(b, a), TYPE_NUMBER)
-                else:
-                    offset = size
             if more is not None:
                 offset = more(slice, offset, opcode)
-
         offset += 1
     current_slice = 0
 
+# -+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 
+# Data Stack
 #
-# Data stack implementation
-#
+# The data stack holds all non-permanent items. It's a basic, Forth-style
+# last-in, first-out (LIFO) model. But it does track types as well as the raw
+# values.
 
-stack = []
-types = []
+stack = []    # holds the data items
+types = []    # holds the types for data items
 
 
 def stack_clear():
     """remove all values from the stack"""
     global stack, types
-    i = 0
-    while i < len(stack):
-        stack.pop()
-        types.pop()
+    stack = []
+    types = []
 
 
 def stack_push(value, type):
@@ -839,35 +1075,33 @@ def stack_push(value, type):
 def stack_drop():
     """remove a value from the stack"""
     global stack, types
-    stack.pop()
-    types.pop()
+    stack_pop()
 
 
-def stack_pop():
+def stack_pop(type = False):
     """remove and return a value from the stack"""
     global stack, types
-    types.pop()
-    return stack.pop()
+    if type:
+        return stack.pop(), types.pop()
+    else:
+        types.pop()
+        return stack.pop()
 
 
 def tos():
     """return a pointer to the top element in the stack"""
-    global stack, types
     return len(stack) - 1
 
 
 def stack_type():
     """return the type identifier for the top item on the stack"""
-    global stack, types
     return types[tos()]
 
 
 def stack_swap():
     """switch the positions of the top items on the stack"""
-    at = stack_type()
-    av = stack_pop()
-    bt = stack_type()
-    bv = stack_pop()
+    av, at = stack_pop(type = True)
+    bv, bt = stack_pop(type = True)
     stack_push(av, at)
     stack_push(bv, bt)
 
@@ -875,8 +1109,7 @@ def stack_swap():
 def stack_dup():
     """duplicate the top item on the stack"""
     """if the value is a string, makes a copy of it"""
-    at = stack_type()
-    av = stack_pop()
+    av, at = stack_pop(type = True)
     stack_push(av, at)
     if at == TYPE_STRING:
         s = request_slice()
@@ -908,7 +1141,11 @@ def stack_change_type(desired):
         if original == TYPE_NUMBER:
             stack_push(string_to_slice(str(stack_pop())), TYPE_STRING)
         elif original == TYPE_CHARACTER:
-            stack_push(string_to_slice(str(chr(stack_pop()))), TYPE_STRING)
+            v = stack_pop()
+            if (v >= 32 and v <= 128) or v == 10 or v == 13:
+                stack_push(string_to_slice(str(chr(v))), TYPE_STRING)
+            else:
+                stack_push(string_to_slice(str(chr(0))), TYPE_STRING)
         elif original == TYPE_FLAG:
             s = stack_pop()
             if s == -1:
@@ -950,26 +1187,26 @@ def stack_change_type(desired):
             stack_push(a, TYPE_FUNCTION_CALL)
     else:
         a = stack_pop()
-        stack_push(a, desired)          
+        stack_push(a, desired)
 
+# -+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 
+# The Dictionary
 #
-# Parable's dictionary consists of two related arrays.
-# The first contains the names. The second contains pointers
-# to the slices for each named item.
-#
+# Like Forth, Parable uses a dictionary to map names to pointers. Ours consists
+# of two arrays: one for the names and a second one for the pointers.
 
-dictionary_names = []
-dictionary_slices = []
-dictionary_hidden_slices = []
+dictionary_warnings = False     # Used to trigger a warning if a name is redefined
+dictionary_names = []           # Holds the names for each slice
+dictionary_slices = []          # Holds the slice for each name
+dictionary_hidden_slices = []   # Holds a list of slices that previously had names
+
 
 def in_dictionary(s):
-    global dictionary_names, dictionary_slices
     return s in dictionary_names
 
 
 def lookup_pointer(name):
-    global dictionary_names, dictionary_slices
     if in_dictionary(name) is False:
         return -1
     else:
@@ -982,6 +1219,8 @@ def add_definition(name, slice):
         dictionary_names.append(name)
         dictionary_slices.append(slice)
     else:
+        if dictionary_warnings:
+            report('W10: ' + name + ' redefined')
         target = dictionary_slices[dictionary_names.index(name)]
         copy_slice(slice, target)
     return dictionary_names.index(name)
@@ -992,36 +1231,58 @@ def remove_name(name):
     if in_dictionary(name) is not False:
         i = dictionary_names.index(name)
         del dictionary_names[i]
-        dictionary_hidden_slices.append(dictionary_slices[i])
+        if not dictionary_slices[i] in dictionary_hidden_slices:
+            dictionary_hidden_slices.append(dictionary_slices[i])
         del dictionary_slices[i]
 
 
-#
-# in parable, memory is divided into regions called slices
-# compiled code, strings, and other data are stored in these.
-#
+def pointer_to_name(ptr):
+    """given a parable pointer, return the corresponding name, or"""
+    """an empty string"""
+    global dictionary_names, dictionary_slices
+    s = ""
+    if ptr in dictionary_slices:
+        s = dictionary_names[dictionary_slices.index(ptr)]
+    return s
 
-memory_values = []
-memory_types = []
-memory_map = []
-memory_size = []
+# -+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+# Memory
+#
+# Parable has a segmented memory model. Memory is divided into regions called
+# slices. Each slice stores values, and has a shadow slice which stores the
+# associated types.
+#
+# Parable implements this over several arrays:
+
+memory_values = []    # Contains the slices for storing data
+memory_types = []     # Contains the slices for storing types
+memory_map = []       # A simple structure for indicating which slices are in use
+memory_size = []      # A simple structure for indicating the number of items
+                      # in each slice
 
 
 def request_slice(attempts=1):
     """request a new memory slice"""
-    global memory_values, memory_types, memory_map, memory_size, MAX_SLICES
+    global memory_values, memory_types, memory_map, memory_size
     i = 0
-    while i < MAX_SLICES:
+    while i < len(memory_map):
         if memory_map[i] == 0:
             memory_map[i] = 1
             memory_values[i] = [0]
-            memory_types[i] = [TYPE_NUMBER]
+            memory_types[i] = [0]
             memory_size[i] = 0
             return i
         else:
             i += 1
     if attempts == 1:
-        collect_garbage()
+        i = 0
+        while i < 10:
+            memory_map.append(0)
+            memory_values.append(0)
+            memory_types.append(0)
+            memory_size.append(0)
+            i = i + 1
         return request_slice(2)
     else:
         return -1
@@ -1029,18 +1290,22 @@ def request_slice(attempts=1):
 
 def release_slice(slice):
     """release a slice. the slice should not be used after this is done"""
-    global memory_map
-    memory_map[int(slice)] = 0
+    global memory_map, memory_size, memory_values, memory_types
+    slice = int(slice)
+    memory_map[slice] = 0
+    memory_size[slice] = 0
+    memory_values[slice] = 0
+    memory_types[slice] = 0
+
 
 
 def copy_slice(source, dest):
     """copy the contents of one slice to another"""
-    global memory_values, memory_map, memory_size
+    global memory_size
     i = 0
     l = memory_size[int(source)]
     while i <= l:
-        v = fetch(int(source), i)
-        t = fetch_type(int(source), i)
+        v, t = fetch(int(source), i)
         store(v, int(dest), i, t)
         i += 1
     memory_size[int(dest)] = memory_size[int(source)]
@@ -1048,48 +1313,38 @@ def copy_slice(source, dest):
 
 def prepare_slices():
     """prepare the initial set of slices for use"""
-    global memory_values, memory_types, memory_map, memory_size, MAX_SLICES
-    memory_map = [0 for x in range(MAX_SLICES)]
-    memory_values = [0 for x in range(MAX_SLICES)]
-    memory_types = [0 for x in range(MAX_SLICES)]
-    memory_size = [0 for x in range(MAX_SLICES)]
+    global memory_values, memory_types, memory_map, memory_size, INITIAL_SLICES
+    memory_map = [0 for x in range(INITIAL_SLICES)]
+    memory_values = [0 for x in range(INITIAL_SLICES)]
+    memory_types = [0 for x in range(INITIAL_SLICES)]
+    memory_size = [0 for x in range(INITIAL_SLICES)]
 
 
 def fetch(slice, offset):
-    """obtain a value stored in a slice"""
-    global memory_values, memory_map
-    if get_last_index(slice) < offset:
-        set_slice_last_index(slice, offset)
-    return memory_values[int(slice)][int(offset)]
-
-
-def fetch_type(slice, offset):
-    """obtain a value stored in a slice"""
-    global memory_types, memory_map
-    if get_last_index(slice) < offset:
-        set_slice_last_index(slice, offset)
-    return memory_types[int(slice)][int(offset)]
+    """return a stored value and type"""
+    if get_last_index(slice) < abs(offset):
+        set_slice_last_index(slice, abs(offset))
+    return memory_values[int(slice)][int(offset)], memory_types[int(slice)][int(offset)]
 
 
 def store_type(slice, offset, type):
-    global memory_values, memory_types, memory_map
-    if get_last_index(slice) < offset:
-        set_slice_last_index(slice, offset)
+    global memory_types
+    if get_last_index(slice) < abs(offset):
+        set_slice_last_index(slice, abs(offset))
     memory_types[int(slice)][int(offset)] = type
 
 
 def store(value, slice, offset, type=100):
     """store a value into a slice"""
-    global memory_values, memory_types, memory_map
-    if get_last_index(slice) < offset:
-        set_slice_last_index(slice, offset)
+    global memory_values, memory_types
+    if get_last_index(slice) < abs(offset):
+        set_slice_last_index(slice, abs(offset))
     memory_values[int(slice)][int(offset)] = value
     memory_types[int(slice)][int(offset)] = type
 
 
 def get_last_index(slice):
     """get the length of a slice"""
-    global memory_size
     return memory_size[int(slice)]
 
 
@@ -1128,16 +1383,22 @@ def slice_to_string(slice):
     i = 0
     size = get_last_index(int(slice))
     while i <= size:
-        s.append(chr(int(fetch(slice, i))))
+        try: s.append(chr(int(fetch(slice, i)[0])))
+        except: pass
         i += 1
     return ''.join(s)
 
+# -+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 
+# Garbage Collection
 #
-# unused slices can be reclaimed either manually using release_slice(),
-# or parable can attempt to identify them and reclaim them automatically.
-# the code here implements the garbage collector.
+# Parable's memory model is flexible, but prone to wasting memory due to the
+# existance of short-lived allocations. This isn't generally a problem, but
+# it's useful to be able to reclaim memory if/when the memory space begins
+# getting restricted.
 #
+# The solution to this is the garbage collector. It's a piece of code that
+# scans memory for slices that aren't referenced, and reclaims them.
 
 def is_pointer(type):
     flag = False
@@ -1151,33 +1412,36 @@ def is_pointer(type):
     return flag
 
 
-def find_references(s):
-    """given a slice, return a list of all references in it"""
+def scan_slice(s):
     ptrs = []
-    i = 0
-    if s < 0:
-        return []
-    if get_last_index(s) <= 0:
-        type = fetch_type(s, 0)
-        if is_pointer(type):
-            if not fetch(s, 0) in ptrs:
-                ptrs.append(int(fetch(s, 0)))
-        if type == TYPE_POINTER or type == TYPE_FUNCTION_CALL:
-            for xt in find_references(int(fetch(s, 0))):
-                if not fetch(s, 0) in ptrs:
-                    ptrs.append(int(xt))
-    else:
-        while i < get_last_index(s):
-            type = fetch_type(s, i)
-            if is_pointer(type):
-                if not fetch(s, i) in ptrs:
-                    ptrs.append(int(fetch(s, i)))
-            if type == TYPE_POINTER or type == TYPE_FUNCTION_CALL:
-                for xt in find_references(int(fetch(s, i))):
-                    if not xt in ptrs:
-                        ptrs.append(int(xt))
-            i += 1
-    return list(set(ptrs))
+    i = get_last_index(s)
+    while i >= 0:
+        try:
+            v, t = fetch(s, i)
+            v = int(v)
+        except:
+            t = 0
+            v = 0
+        if is_pointer(t):
+            if not v in ptrs:
+                ptrs.append(v)
+        i = i - 1
+    return ptrs
+
+
+def find_references(s):
+    ptrs = scan_slice(s)
+    l = len(ptrs)
+    ln = 0
+    while l != ln:
+        l = len(ptrs)
+        for x in ptrs:
+            new = scan_slice(x)
+            for n in new:
+                if not n in ptrs:
+                    ptrs.append(n)
+        ln = len(ptrs)
+    return ptrs
 
 
 def seek_all_references():
@@ -1217,46 +1481,57 @@ def seek_all_references():
 
 def collect_garbage():
     """scan memory, and collect unused slices"""
-    global MAX_SLICES, memory_map
     i = 0
     refs = seek_all_references()
-    while i < MAX_SLICES:
+    while i < INITIAL_SLICES:
         if not i in refs and memory_map[i] == 1:
             release_slice(i)
         i = i + 1
 
+# -+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+# The Compiler
 #
-# the compiler is pretty trivial.
-# we take a string, break it into tokens, then lay down bytecode based on
-# single character prefixes.
+# This is the core of the user-facing language. It takes a string, breaks it
+# into tokens, then lays down code based on the prefix each token has.
 #
-# #  Numbers
-# $  Characters
-# &  Pointers
-# `  Bytecodes
-# '  Strings
-# "  Comments
+# Prefixes are:
 #
-# the bytecode forms are kept simple:
+#   #   Numbers
+#   $   Characters
+#   &   Pointers
+#   `   Bytecodes
+#   '   Strings
+#   "   Comments
 #
-# type           stored         type
-# ==========     ============================
-# Functions      pointer        function call
-# Strings        pointer        string
-# Numbers        VALUE          number
-# Characters     ASCII_VALUE    character
-# Pointers       pointer        pointer
-# Bytecodes      bytecode       bytecode
-# Comments       pointer        comment
+# The bytecode forms are kept simple:
 #
-# for two functions ([ and ]), new quotes are started or closed. These are
-# the only case where the corresponding action is run automatically rather
-# than being compiled.
+#   type           stored         type
+#   ==========     ============================
+#   Functions      pointer        function call
+#   Strings        pointer        string
+#   Numbers        VALUE          number
+#   Characters     ASCII_VALUE    character
+#   Pointers       pointer        pointer
+#   Bytecodes      bytecode       bytecode
+#   Comments       pointer        comment
 #
-# bytecodes get wrapped into named functions. At this point they are not
+# There are two special prefixes:
+#
+#   @<pointer>
+#   !<pointer>
+#
+# These correspond to the following bytecode sequences:
+#
+#   &<pointer> #0 fetch
+#   &<pointer> #0 store
+#
+# The compiler handle two implicit pieces of functionality: [ and ]. These
+# are used to begin and end quotations.
+#
+# Bytecodes get wrapped into named functions. At this point they are not
 # inlined. This hurts performance, but makes the implementation much simpler.
 #
-
 # The compile_ functions take a parameter, a slice, and the current offset
 # in that slice. They lay down the appropriate byte codes for the type of
 # item they are compiling. When done, they return the new offset.
@@ -1316,7 +1591,8 @@ def compile_function_call(name, slice, offset):
         store(lookup_pointer(name), slice, offset, TYPE_FUNCTION_CALL)
         offset += 1
     else:
-        report('E03: Compile Error: Unable to map ' + name + ' to a pointer')
+        if name != "":
+            report('E03: Compile Error: Unable to map `' + name + '` to a pointer')
     return offset
 
 
@@ -1339,12 +1615,14 @@ def parse_string(tokens, i, count, delimiter):
                 i = j
                 j = count
             j += 1
-    return i, s.replace("\\", "")
+    final = s.replace("\\n", "\n").replace("\\t", "\t")
+    return i, final.replace("\\", "")
 
 
 def compile(str, slice):
     global should_abort
     should_abort = False
+    prefixes = { '`', '#', '$', '&', '\'', '"', '@', '!', }
     nest = []
     tokens = ' '.join(str.split()).split(' ')
     count = len(tokens)
@@ -1355,6 +1633,10 @@ def compile(str, slice):
     while i < count:
         current = tokens[i]
         prefix = tokens[i][:1]
+        if prefix in prefixes:
+            current = tokens[i][1:]
+        else:
+            current = tokens[i]
         s = ""
         if prefix == '"':
             i, s = parse_string(tokens, i, count, '"')
@@ -1363,21 +1645,21 @@ def compile(str, slice):
             i, s = parse_string(tokens, i, count, '\'')
             offset = compile_string(s[1:-1], slice, offset)
         elif prefix == "$":
-            v = ord(current[1:][0].encode('utf-8'))
+            v = ord(current[0].encode('utf-8'))
             offset = compile_character(v, slice, offset)
         elif prefix == "&":
-            offset = compile_pointer(current[1:], slice, offset)
+            offset = compile_pointer(current, slice, offset)
         elif prefix == "#":
-            offset = compile_number(current[1:], slice, offset)
+            offset = compile_number(current, slice, offset)
         elif prefix == "`":
-            offset = compile_bytecode(current[1:], slice, offset)
+            offset = compile_bytecode(current, slice, offset)
         elif prefix == "@":
-            offset = compile_pointer(current[1:], slice, offset)
-            offset = compile_number(0, slice, offset)
+            offset = compile_pointer(current, slice, offset)
+            offset = compile_number(1, slice, offset)
             offset = compile_bytecode(BC_MEM_FETCH, slice, offset)
         elif prefix == "!":
-            offset = compile_pointer(current[1:], slice, offset)
-            offset = compile_number(0, slice, offset)
+            offset = compile_pointer(current, slice, offset)
+            offset = compile_number(1, slice, offset)
             offset = compile_bytecode(BC_MEM_STORE, slice, offset)
         elif current == "[":
             nest.append(slice)
@@ -1385,13 +1667,17 @@ def compile(str, slice):
             slice = request_slice()
             offset = 0
         elif current == "]":
-            old = slice
-            if offset == 0:
-                store(BC_FLOW_RETURN, slice, offset, TYPE_BYTECODE)
-            offset = nest.pop()
-            slice = nest.pop()
-            store(old, slice, offset, TYPE_POINTER)
-            offset += 1
+            if len(nest) == 0:
+                report('E03: Compile Error - quotations not balanced')
+                return slice
+            else:
+                old = slice
+                if offset == 0:
+                    store(BC_FLOW_RETURN, slice, offset, TYPE_BYTECODE)
+                offset = nest.pop()
+                slice = nest.pop()
+                store(old, slice, offset, TYPE_POINTER)
+                offset += 1
         else:
             if is_number(current):
                 offset = compile_number(current, slice, offset)
@@ -1400,8 +1686,15 @@ def compile(str, slice):
         i += 1
         if offset == 0:
             store(BC_FLOW_RETURN, slice, offset, TYPE_BYTECODE)
+    if len(nest) != 0:
+        report('E03: Compile Error - quotations not balanced')
     return slice
 
+# -+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+# Final Bits
+#
+# A few things to help get the initial environment up and running.
 
 def parse_bootstrap(f):
     """compile the bootstrap package it into memory"""
@@ -1410,25 +1703,13 @@ def parse_bootstrap(f):
             interpret(compile(line, request_slice()))
 
 
-#
 # some parts of the language (prefixes, brackets) are understood as part of
 # the parser. but one important bit, the ability to give a name to an item,
 # is not. this routine sets up an initial dictionary containing the *define*
 # function. with this loaded, all else can be built.
-#
 
 def prepare_dictionary():
     """setup the initial dictionary"""
     s = request_slice()
-    store(BC_QUOTE_NAME, s, 0, TYPE_BYTECODE)
-    add_definition('define', s)
-
-
-def pointer_to_name(ptr):
-    """given a parable pointer, return the corresponding name, or"""
-    """an empty string"""
-    global dictionary_names, dictionary_slices
-    s = ""
-    if ptr in dictionary_slices:
-        s = dictionary_names[dictionary_slices.index(ptr)]
-    return s
+    compile('"ps-" `48 "Attach a name to a pointer"', s)
+    add_definition(':', s)

@@ -183,7 +183,7 @@ def rewrite(str):
             i += 1
             names.append(tokens[i])
         elif token == ";":
-            new = new + " ] '" + names.pop() + "' define"
+            new = new + " ] '" + names.pop() + "' :"
         elif token == "if":
             new = new + " ["
             condc = condc + 1
