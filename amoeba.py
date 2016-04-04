@@ -37,8 +37,8 @@ def dump_stack():
     """display the stack"""
     i = 0
     while i < len(parable.stack):
-        tos = parable.stack[i]
-        type = parable.types[i]
+        tos = parable.stack_value_for(i)
+        type = parable.stack_type_for(i)
         sys.stdout.write("\t" + str(i))
         if type == parable.TYPE_NUMBER:
             display_item('#', tos)
@@ -66,7 +66,7 @@ def dump_stack():
 def dump_dict():
     """display named items"""
     l = ''
-    for w in parable.dictionary_names:
+    for w in parable.dictionary_names():
         l = l + w + ' '
     sys.stdout.write(l)
     sys.stdout.write("\n")
@@ -104,7 +104,7 @@ def opcodes(slice, offset, opcode):
     elif opcode == 9040:
         s = parable.request_slice()
         i = 0
-        for word in parable.dictionary_names:
+        for word in parable.dictionary_names():
             value = parable.string_to_slice(word)
             parable.store(value, s, i, parable.TYPE_STRING)
             i = i + 1

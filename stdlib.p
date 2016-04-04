@@ -8,64 +8,63 @@
 [ "nn-n"   `6  "Divide n1 by n2" ] '/' :
 [ "nn-n"   `7  "Divide n1 by n2, returning the remainder" ] 'rem' :
 [ "nn-n"   `8  "Return n1 to the power n2" ] '^' :
-[ "nn-n"   `9 "Return the logarithim of a number in the specified base" ] 'log<n>' :
+[ "nn-n"   `9 "Return the logarithm of a number in the specified base" ] 'log<n>' :
 [ "nn-n"   `10 "Perform a bitwise shift" ] 'shift' :
 [ "nn-n"   `11 "Bitwise AND operation" ] 'and' :
 [ "nn-n"   `12 "Bitwise OR operation" ] 'or' :
 [ "nn-n"   `13 "Bitwise XOR operation" ] 'xor' :
 [ "-n"     `14 "Return a random number" ] 'random' :
 [ "n-n"    `15 "Obtain the square root of a number" ] 'sqrt' :
-[ "n-n"    `16 "Round a number to the nearest integer value" ] 'round' :
-[ "nn-f"   `17 "True if n1 < n2 or false otherwise" ] 'lt?' :
-[ "nn-f"   `18 "True if n1 > n2 or false otherwise" ] 'gt?' :
-[ "nn-f"   `19 "True if n1 <= n2 or false otherwise" ] 'lteq?' :
-[ "nn-f"   `20 "True if n1 >= n2 or false otherwise" ] 'gteq?' :
-[ "vv-f"   `21 "True if n1 == n2 or false otherwise" ] 'eq?' :
-[ "vv-f"   `22 "True if n1 != n2 or false otherwise" ] '-eq?' :
-[ "fpp-"   `23 "If flag is true, invoke p1; otherwise invoke p2" ] 'if' :
-[ "p-"     `24 "Invoke p (which should return a flag) until the returned flag is false" ] 'while' :
-[ "p-"     `25 "Invoke p (which should return a flag) until the returned flag is true" ] 'until' :
-[ "np-"    `26 "Invoke slice p the specified number of times" ] 'times' :
-[ "p-"     `27 "Run the code in slice p" ] 'invoke' :
-[ "vp-v"   `28 "Remove value and invoke the quote. Restore value when execution completes." ] 'dip' :
-[ "vp-v"   `29 "Invoke the quote. After execution complets, restore a copy of the value to the stack" ] 'sip' :
-[ "vpp-?"  `30 "Apply each quote to a copy of the value" ] 'bi' :
-[ "vppp-?" `31 "Apply each quote to a copy of the value" ] 'tri' :
-[ "-"      `32 "Abort the current execution cycle" ] 'abort' :
-[ "pp-"    `34 "Copy the contents of the first slice to the second one" ] 'copy' :
-[ "pn-v"   `35 "Fetch a value stored at the specified offset within the specified slice" ] 'fetch' :
-[ "vpn-"   `36 "Store a value into the specified offset within the specified slice" ] 'store' :
-[ "-p"     `37 "Request a new slice and return a pointer to it" ] 'request' :
-[ "p-"     `38 "Release a previously allocated slice" ] 'release' :
-[ "-"      `39 "Tell Parable that this is a good time to scan memory for unused slices and reclaim them" ] 'collect-garbage' :
-[ "p-n"    `40 "Return the last offset in a slice" ] 'get<final-offset>' :
-[ "np-"    `41 "Set the last index in a slice (can be used to shrink or grow a slice)" ] 'set<final-offset>' :
-[ "tpn-"   `42 "Set the stored type for the value at offset with the slice to the specified type." ] 'store<type>' :
-[ "pn-n"   `43 "Get the stored type for a value within a slice." ] 'fetch<type>' :
-[ "v-vv"   `44 "Duplicate the top value on the stack" ] 'dup' :
-[ "v-"     `45 "Discard the top value on the stack" ] 'drop' :
-[ "vV-Vv"  `46 "Switch the positions of the top two items on the stack" ] 'swap' :
-[ "-n"     `47 "Return the number of items on the stack" ] 'depth' :
-[ "s-"     `49 "Remove the named item from the dictionary" ] 'hide-word' :
-[ "ss-n"   `50 "Search for substring (s2) in a source string (s1). Returns #nan if not found." ] 'find' :
-[ "pnn-p"  `51 "Return a new slice containing the contents of the original slice, starting from the specified offset and ending at (but not including) the ending offset." ] 'subslice' :
-[ "s-f"    `52 "If string can be converted to a number, return true, otherwise return false" ] 'numeric?' :
-[ "p-p"    `53 "Reverse the order of items in a slice. This modifies the original slice." ] 'reverse' :
-[ "v-v"    `54 "Convert a string or character to lowercase" ] 'to-lowercase' :
-[ "v-v"    `55 "Convert a string or character to uppercase" ] 'to-uppercase' :
-[ "s-"     `56 "Add a string to the error log" ] 'report-error' :
-[ "-p"     `57 "Return an array of strings corresponding to names in the dictionary" ] 'vm.dict<names>' :
-[ "-p"     `58 "Return an array of slices corresponding to the named items in the dictionary" ] 'vm.dict<slices>' :
-[ "n-n"    `59 "Return the sine of a number" ] 'sin' :
-[ "n-n"    `60 "Return the cosine of a number" ] 'cos' :
-[ "n-n"    `61 "Return the tangent of a number" ] 'tan' :
-[ "n-n"    `62 "Return the arc sine of a number" ] 'asin' :
-[ "n-n"    `63 "Return the arc cosine of a number" ] 'acos' :
-[ "n-n"    `64 "Return the arc tangent of a number" ] 'atan' :
-[ "n-n"    `65 "Return the arc tangent of a number" ] 'atan2' :
-[ "-p"     `66 "Return an array indicating which slices are allocated and which are free. Each index corresponds to a slice. If the stored value is 0, the slice is free. If 1, the slice is allocated." ] 'vm.memory<map>' :
-[ "-p"     `67 "Return an array indicating the size of each slice (in cells). Each index corresponds to a slice; the stored value is the length of the slice." ] 'vm.memory<sizes>' :
-[ "-p"     `68 "Return an array of slice numbers which are currently marked as allocated." ] 'vm.memory<allocated>' :
+[ "nn-f"   `16 "True if n1 < n2 or false otherwise" ] 'lt?' :
+[ "nn-f"   `17 "True if n1 > n2 or false otherwise" ] 'gt?' :
+[ "nn-f"   `18 "True if n1 <= n2 or false otherwise" ] 'lteq?' :
+[ "nn-f"   `19 "True if n1 >= n2 or false otherwise" ] 'gteq?' :
+[ "vv-f"   `20 "True if n1 == n2 or false otherwise" ] 'eq?' :
+[ "vv-f"   `21 "True if n1 != n2 or false otherwise" ] '-eq?' :
+[ "fpp-"   `22 "If flag is true, invoke p1; otherwise invoke p2" ] 'if' :
+[ "p-"     `23 "Invoke p (which should return a flag) until the returned flag is false" ] 'while' :
+[ "p-"     `24 "Invoke p (which should return a flag) until the returned flag is true" ] 'until' :
+[ "np-"    `25 "Invoke slice p the specified number of times" ] 'times' :
+[ "p-"     `26 "Run the code in slice p" ] 'invoke' :
+[ "vp-v"   `27 "Remove value and invoke the quote. Restore value when execution completes." ] 'dip' :
+[ "vp-v"   `28 "Invoke the quote. After execution complets, restore a copy of the value to the stack" ] 'sip' :
+[ "vpp-?"  `29 "Apply each quote to a copy of the value" ] 'bi' :
+[ "vppp-?" `30 "Apply each quote to a copy of the value" ] 'tri' :
+[ "-"      `31 "Abort the current execution cycle" ] 'abort' :
+[ "pp-"    `32 "Copy the contents of the first slice to the second one" ] 'copy' :
+[ "pn-v"   `33 "Fetch a value stored at the specified offset within the specified slice" ] 'fetch' :
+[ "vpn-"   `34 "Store a value into the specified offset within the specified slice" ] 'store' :
+[ "-p"     `35 "Request a new slice and return a pointer to it" ] 'request' :
+[ "p-"     `36 "Release a previously allocated slice" ] 'release' :
+[ "-"      `37 "Tell Parable that this is a good time to scan memory for unused slices and reclaim them" ] 'collect-garbage' :
+[ "p-n"    `38 "Return the last offset in a slice" ] 'get<final-offset>' :
+[ "np-"    `39 "Set the last index in a slice (can be used to shrink or grow a slice)" ] 'set<final-offset>' :
+[ "tpn-"   `40 "Set the stored type for the value at offset with the slice to the specified type." ] 'store<type>' :
+[ "pn-n"   `41 "Get the stored type for a value within a slice." ] 'fetch<type>' :
+[ "v-vv"   `42 "Duplicate the top value on the stack" ] 'dup' :
+[ "v-"     `43 "Discard the top value on the stack" ] 'drop' :
+[ "vV-Vv"  `44 "Switch the positions of the top two items on the stack" ] 'swap' :
+[ "-n"     `45 "Return the number of items on the stack" ] 'depth' :
+[ "s-"     `47 "Remove the named item from the dictionary" ] 'hide-word' :
+[ "ss-n"   `48 "Search for substring (s2) in a source string (s1). Returns #nan if not found." ] 'find' :
+[ "pnn-p"  `49 "Return a new slice containing the contents of the original slice, starting from the specified offset and ending at (but not including) the ending offset." ] 'subslice' :
+[ "s-f"    `50 "If string can be converted to a number, return true, otherwise return false" ] 'numeric?' :
+[ "p-p"    `51 "Reverse the order of items in a slice. This modifies the original slice." ] 'reverse' :
+[ "v-v"    `52 "Convert a string or character to lowercase" ] 'to-lowercase' :
+[ "v-v"    `53 "Convert a string or character to uppercase" ] 'to-uppercase' :
+[ "s-"     `54 "Add a string to the error log" ] 'report-error' :
+[ "-p"     `55 "Return an array of strings corresponding to names in the dictionary" ] 'vm.dict<names>' :
+[ "-p"     `56 "Return an array of slices corresponding to the named items in the dictionary" ] 'vm.dict<slices>' :
+[ "n-n"    `57 "Return the sine of a number" ] 'sin' :
+[ "n-n"    `58 "Return the cosine of a number" ] 'cos' :
+[ "n-n"    `59 "Return the tangent of a number" ] 'tan' :
+[ "n-n"    `60 "Return the arc sine of a number" ] 'asin' :
+[ "n-n"    `61 "Return the arc cosine of a number" ] 'acos' :
+[ "n-n"    `62 "Return the arc tangent of a number" ] 'atan' :
+[ "n-n"    `63 "Return the arc tangent of a number" ] 'atan2' :
+[ "-p"     `64 "Return an array indicating which slices are allocated and which are free. Each index corresponds to a slice. If the stored value is 0, the slice is free. If 1, the slice is allocated." ] 'vm.memory<map>' :
+[ "-p"     `65 "Return an array indicating the size of each slice (in cells). Each index corresponds to a slice; the stored value is the length of the slice." ] 'vm.memory<sizes>' :
+[ "-p"     `66 "Return an array of slice numbers which are currently marked as allocated." ] 'vm.memory<allocated>' :
 
 [ "vV-vVv" \
   [ dup ] dip swap \
@@ -126,13 +125,14 @@
 "Stack Flow"
 [ "vV-vVvV"  over over   "Duplicate the top two items on the stack" ] 'dup-pair' :
 [ "vv-"      drop drop   "Discard the top two items on the stack" ] 'drop-pair' :
-[ "?n-"      [ drop ] times   "Discard an arbitrary number of items from the stack" ] 'drop-multiple' :
+[ "?n-"      [ drop ] times   "Discard an arbitrary number of items from the stack" ] 'drop<n>' :
 [ "q-...n"   depth [ invoke ] dip depth swap - \
   "Execute a quotation, returning a value indicating th stack depth change as a result" \
 ] 'invoke<depth?>' :
 
 [ "n-n"  [ 1 / ] [ 1 rem ] bi - "Return the smallest integer less than or equal to the starting value" ] 'floor' :
 [ "n-n"  dup floor dup-pair eq? [ drop ] [ nip 1 + ] if "Return the smallest integer greater than or equal to the starting value" ] 'ceil' :
+[ "n-n"  0.5 + floor "Round a number to the nearest integer value" ] 'round' :
 
 
 "Slice Functions"
@@ -154,11 +154,19 @@
 [ "p-"   0 swap 1 store "Set a variable to a value of 0" ] 'off' :
 [ "p-"   -1 swap 1 store "Set a variable to a value of -1" ] 'on' :
 
-[ "p-"   [ 1 fetch 1 + ] sip 1 store \
+[ "np-"  swap over 1 fetch + swap 1 store \
+  "Increment a variable by the specified amount" \
+] 'increment<by>' :
+
+[ "p-"   1 swap increment<by> \
   "Increment a variables value by 1" \
 ] 'increment' :
 
-[ "p-"   [ 1 fetch 1 - ] sip 1 store \
+[ "np-"  swap over 1 fetch swap - swap 1 store \
+  "Decrement a variable by the specified amount" \
+] 'decrement<by>' :
+
+[ "p-"   1 swap decrement<by> \
   "Increment a variables value by 1" \
 ] 'decrement' :
 
@@ -222,8 +230,7 @@
     [ [ [ dup 1 - ] dip dup-pair eq? ] until ] if \
   drop \
   "Given two values, expand the range" \
-] 'expand-range' :
-[ "...n-n"  1 - [ + ] times "Given a series of values and a count, sum the values" ] 'sum-range' :
+] 'range' :
 
 
 "Misc"
@@ -266,13 +273,15 @@
 
 [ "p-v"    :p [ dup get<final-offset> fetch ] sip dup length? 2 - swap set<final-offset> "Remove the last value from the specified slice. This modifies the original slice." ] 'pop' :
 
+[ "p-p"    [ head ] [ body ] bi [ push ] sip "Move the head of the slice to the tail" ] 'cycle' :
+
 [ "-p"     request [ pop drop ] sip "Request a slice with no stored values" ] 'request-empty' :
 
-[ "pnp-n"  [ !XT over length? [ over pop @XT invoke ] times nip ] localize \
+[ "pnp-n"  [ !XT [ duplicate-slice ] dip over length? [ over pop @XT invoke ] times nip ] localize \
   "Takes a slice, a starting value, and a quote. It executes the quote once for each item in the slice, passing the item and the value to the quote. The quote should consume both and return a new value." \
 ] 'reduce' :
 
-[ "pp-?"   [ !XT !Source 0 !Offset @Source length? [ @Source @Offset fetch @XT invoke @Offset 1 + !Offset ] times ] localize \
+[ "pp-?"   [ !XT duplicate-slice !Source 0 !Offset @Source length? [ @Source @Offset fetch @XT invoke &Offset increment ] times ] localize \
   "Takes a slice and a quotation. It then executes the quote once for each item in the slice, passing the individual items to the quote." \
 ] 'for-each' :
 
@@ -280,22 +289,24 @@
   "Given a slice and a value, return true if the value is found in the slice, or false otherwise." \
  ] 'contains?' :
 
-[ "pq-p"   [ !XT !Source request-empty !Target 0 !Offset @Source length? [ @Source @Offset fetch @XT invoke [ @Source @Offset fetch @Target push ] if-true @Offset 1 + !Offset ] times @Target ] localize \
+[ "pq-p"   [ !XT !Source request-empty !Target 0 !Offset @Source length? [ @Source @Offset fetch @XT invoke [ @Source @Offset fetch @Target push ] if-true &Offset increment ] times @Target ] localize \
   "Given a slice and a quotation, this will pass each value to the quotation (executing it once per item in the slice). The quotation should return a Boolean flag. If the flag is true, copy the value to a new slice. Otherwise discard it." \
 ] 'filter' :
 
-[ "pq-"    [ !XT duplicate-slice !Source 0 !Offset @Source length? [ @Source @Offset fetch @XT invoke @Source @Offset store @Offset 1 + !Offset ] times @Source ] localize \
+[ "pq-"    [ !XT duplicate-slice !Source 0 !Offset @Source length? [ @Source @Offset fetch @XT invoke @Source @Offset store &Offset increment ] times @Source ] localize \
   "Given a pointer to an array and a quotation, execute the quotation once for each item in the array. Construct a new array from the value returned by the quotation and return a pointer to it." \
 ] 'map' :
 
 [ "p-p"    [ request !Target invoke<depth?> 0 max [ @Target push ] times @Target 1 over length? subslice :p ] localize \
   "Invoke a quote and capture the results into a new array" \
-] 'capture-results' :
+] 'capture-results<in-stack-order>' :
+
+[ "p-p"    capture-results<in-stack-order> reverse "Invoke a quote and capture the results into a new array" ] 'capture-results' :
 
 [ "pv-n" \
   [ dup-pair !Value !Source \
     contains? \
-    [ 0 !Offset #nan !Found @Source length? [ @Source @Offset fetch @Value types-match? [ eq? [ @Offset !Found ] if-true ] [ drop-pair ] if @Offset 1 + !Offset ] times @Found ] \
+    [ 0 !Offset #nan !Found @Source length? [ @Source @Offset fetch @Value types-match? [ eq? [ @Offset !Found ] if-true ] [ drop-pair ] if &Offset increment ] times @Found ] \
     [ #nan ] if \
   ] localize \
   "Given a slice and a value, return the offset the value is located at, or #nan if not found" \
@@ -306,7 +317,12 @@
 
 [ "s-f"  vm.dict<names> swap contains? "Return true if the named word exists or false otherwise" ] 'word-exists?' :
 
-[ "s-p"  vm.dict<names> swap index-of vm.dict<slices> swap fetch "Return a pointer to the named word if it exists, or #nan otherwise" ] 'lookup-word' :
+[ "s-p" \
+  dup word-exists? \
+  [ vm.dict<names> swap index-of vm.dict<slices> swap fetch ] \
+  [ drop #nan ] if \
+  "Return a pointer to the named word if it exists, or #nan otherwise" \
+] 'lookup-word' :
 
 [ "p-s"  :p vm.dict<slices> over contains? [ vm.dict<slices> swap index-of vm.dict<names> swap fetch ] [ drop '' ] if "If the pointer corresponds to a named item, return the name. Otherwise return an empty string." ] 'lookup-name' :
 
@@ -336,7 +352,7 @@
 [ 'Public'  'Private' ] hide-words
 
 "Vocabularies"
-[ 'with' 'without' 'vocab' '}vocab' '}}' ] {
+[ 'with' 'without' 'vocab' '}vocab' '}}' 'vocab.add-word' ] {
   [ 'Vocabulary' ] ::
 
   [ "p-"  [ invoke redefine ] for-each "Add words in a vocabulary to the dictionary" ] 'with' :
@@ -345,7 +361,7 @@
   [ "ps-" \
     request-empty !Vocabulary \
     @Vocabulary swap : \
-    [ dup lookup-word swap cons @Vocabulary push ] for-each \
+    [ dup word-exists? [ dup lookup-word swap cons @Vocabulary push ] [ drop ] if ] for-each \
     @Vocabulary without \
     "Create a new vocabulary" \
   ] 'vocab' :
@@ -354,6 +370,18 @@
     over } vocab \
     "Close a lexical scope and create a vocabulary with the exposed words" \
   ] '}}' :
+
+  [ "sp-" \
+    over word-exists? [ [ dup lookup-word over hide-word swap cons ] dip push ] [ drop-pair ] if \
+    "Add a word to an existing vocabulary" \
+  ] 'vocab.add-word' :
+}
+
+[ 'vocab{'  '}vocab' ] {
+  [ 'o' ] ::
+
+  [ "-"  vm.dict<names> length? !o "Start a vocabulary block" ] 'vocab{' :
+  [ "s-" vm.dict<names> @o over length? subslice swap vocab "End a vocabulary block" ] '}vocab' :
 }
 
 
@@ -406,7 +434,7 @@
     [ !Tests false !Done 0 !Offset \
       [ @Tests @Offset fetch head invoke \
         [ true !Done @Tests @Offset fetch 1 fetch invoke ] if-true \
-        @Offset 1 + !Offset @Done \
+        &Offset increment @Done \
       ] until \
     ] invoke<preserving> \
     "Takes a pointer to a set of quotations. Each quote in the set should consist of two other quotes: one that returns a flag, and one to be executed if the condition returns true. Executes each until one returns true, then exits." \
@@ -498,7 +526,7 @@
 
 
 "unsorted"
-[ 'stack-values' ] {
+[ 'stack-values' 'rso' ] {
   'S' var
 
   [ "-p" \
@@ -508,6 +536,11 @@
     @S \
     "Return an array with the items currently on the stack" \
   ] 'stack-values' :
+
+  [ "...-..." \
+    stack-values reverse [ reset ] dip &nop for-each \
+    "Reverse the order of all items on the stack" \
+  ] 'rso' :
 }
 
 
@@ -524,7 +557,16 @@
 
 [ "-n"   2.71828182846 "Mathmatical constant for Euler's Number" ] 'E' :
 [ "-n"   3.14159265359 "Mathmatical constant for PI" ] 'PI' :
-[ "n-n"  E log<n> "Return the base E logarithim of a number" ] 'log' :
-[ "n-n"  10 log<n> "Return the base 10 logarithim of a number" ] 'log10' :
+[ "n-n"  E log<n> "Return the base E logarithm of a number" ] 'log' :
+[ "n-n"  10 log<n> "Return the base 10 logarithm of a number" ] 'log10' :
 
 [ "p-p"  [ remark? not nip ] filter "Return a copy of the slice with embedded comments removed" ] 'strip-remarks' :
+
+[ 'times<with-index>' ] {
+  '_' var
+  [ "qq-" \
+    [ &_ ] \
+    [ [ !_ [ @_ invoke range ] capture-results reverse ] dip for-each ] invoke<preserving> \
+    "Construct a range from the values in q1, then execute q2 as a for-each against them" \
+  ] 'times<with-index>' :
+}

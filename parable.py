@@ -14,7 +14,7 @@ import sys
 # Memory Configuration
 #
 
-INITIAL_SLICES = 100
+INITIAL_SLICES = 250
 
 #
 # Constants for data types
@@ -27,7 +27,7 @@ TYPE_POINTER = 400
 TYPE_FLAG = 500
 TYPE_BYTECODE = 600
 TYPE_REMARK = 700
-TYPE_FUNCTION_CALL = 800
+TYPE_FUNCALL = 800
 
 # For precheck(), we also allow matching agains two "generic" types:
 
@@ -97,59 +97,57 @@ BC_BITWISE_OR = 12
 BC_BITWISE_XOR = 13
 BC_RANDOM = 14
 BC_SQRT = 15
-BC_ROUND = 16
-BC_COMPARE_LT = 17
-BC_COMPARE_GT = 18
-BC_COMPARE_LTEQ = 19
-BC_COMPARE_GTEQ = 20
-BC_COMPARE_EQ = 21
-BC_COMPARE_NEQ = 22
-BC_FLOW_IF = 23
-BC_FLOW_WHILE = 24
-BC_FLOW_UNTIL = 25
-BC_FLOW_TIMES = 26
-BC_FLOW_CALL = 27
-BC_FLOW_DIP = 28
-BC_FLOW_SIP = 29
-BC_FLOW_BI = 30
-BC_FLOW_TRI = 31
-BC_FLOW_ABORT = 32
-BC_FLOW_RETURN = 33
-BC_MEM_COPY = 34
-BC_MEM_FETCH = 35
-BC_MEM_STORE = 36
-BC_MEM_REQUEST = 37
-BC_MEM_RELEASE = 38
-BC_MEM_COLLECT = 39
-BC_MEM_GET_LAST = 40
-BC_MEM_SET_LAST = 41
-BC_MEM_SET_TYPE = 42
-BC_MEM_GET_TYPE = 43
-BC_STACK_DUP = 44
-BC_STACK_DROP = 45
-BC_STACK_SWAP = 46
-BC_STACK_DEPTH = 47
-BC_QUOTE_NAME = 48
-BC_FUNCTION_HIDE = 49
-BC_STRING_SEEK = 50
-BC_SLICE_SUBSLICE = 51
-BC_STRING_NUMERIC = 52
-BC_SLICE_REVERSE = 53
-BC_TO_LOWER = 54
-BC_TO_UPPER = 55
-BC_REPORT = 56
-BC_VM_NAMES = 57
-BC_VM_SLICES = 58
-BC_TRIG_SIN = 59
-BC_TRIG_COS = 60
-BC_TRIG_TAN = 61
-BC_TRIG_ASIN = 62
-BC_TRIG_ACOS = 63
-BC_TRIG_ATAN = 64
-BC_TRIG_ATAN2 = 65
-BC_VM_MEM_MAP = 66
-BC_VM_MEM_SIZES = 67
-BC_VM_MEM_ALLOC = 68
+BC_COMPARE_LT = 16
+BC_COMPARE_GT = 17
+BC_COMPARE_LTEQ = 18
+BC_COMPARE_GTEQ = 19
+BC_COMPARE_EQ = 20
+BC_COMPARE_NEQ = 21
+BC_FLOW_IF = 22
+BC_FLOW_WHILE = 23
+BC_FLOW_UNTIL = 24
+BC_FLOW_TIMES = 25
+BC_FLOW_CALL = 26
+BC_FLOW_DIP = 27
+BC_FLOW_SIP = 28
+BC_FLOW_BI = 29
+BC_FLOW_TRI = 30
+BC_FLOW_ABORT = 31
+BC_MEM_COPY = 32
+BC_MEM_FETCH = 33
+BC_MEM_STORE = 34
+BC_MEM_REQUEST = 35
+BC_MEM_RELEASE = 36
+BC_MEM_COLLECT = 37
+BC_MEM_GET_LAST = 38
+BC_MEM_SET_LAST = 39
+BC_MEM_SET_TYPE = 40
+BC_MEM_GET_TYPE = 41
+BC_STACK_DUP = 42
+BC_STACK_DROP = 43
+BC_STACK_SWAP = 44
+BC_STACK_DEPTH = 45
+BC_QUOTE_NAME = 46
+BC_FUNCTION_HIDE = 47
+BC_STRING_SEEK = 48
+BC_SLICE_SUBSLICE = 49
+BC_STRING_NUMERIC = 50
+BC_SLICE_REVERSE = 51
+BC_TO_LOWER = 52
+BC_TO_UPPER = 53
+BC_REPORT = 54
+BC_VM_NAMES = 55
+BC_VM_SLICES = 56
+BC_TRIG_SIN = 57
+BC_TRIG_COS = 58
+BC_TRIG_TAN = 59
+BC_TRIG_ASIN = 60
+BC_TRIG_ACOS = 61
+BC_TRIG_ATAN = 62
+BC_TRIG_ATAN2 = 63
+BC_VM_MEM_MAP = 64
+BC_VM_MEM_SIZES = 65
+BC_VM_MEM_ALLOC = 66
 
 
 # Implement the byte code functions
@@ -180,6 +178,18 @@ def bytecode_add(opcode, offset, more):
         stack_push(b + a, TYPE_NUMBER)
     elif precheck([TYPE_STRING, TYPE_STRING]):
         a = slice_to_string(stack_pop())
+        b = slice_to_string(stack_pop())
+        stack_push(string_to_slice(b + a), TYPE_STRING)
+    elif precheck([TYPE_CHARACTER, TYPE_CHARACTER]):
+        a = chr(int(stack_pop()))
+        b = chr(int(stack_pop()))
+        stack_push(string_to_slice(b + a), TYPE_STRING)
+    elif precheck([TYPE_CHARACTER, TYPE_STRING]):
+        a = slice_to_string(stack_pop())
+        b = chr(int(stack_pop()))
+        stack_push(string_to_slice(b + a), TYPE_STRING)
+    elif precheck([TYPE_STRING, TYPE_CHARACTER]):
+        a = chr(int(stack_pop()))
         b = slice_to_string(stack_pop())
         stack_push(string_to_slice(b + a), TYPE_STRING)
     elif precheck([TYPE_REMARK, TYPE_REMARK]):
@@ -243,13 +253,6 @@ def bytecode_remainder(opcode, offset, more):
             abort_run(opcode, offset)
     else:
         abort_run(opcode, offset)
-
-
-#def bytecode_floor(opcode, offset, more):
-#    if precheck([TYPE_NUMBER]):
-#        stack_push(math.floor(float(stack_pop())), TYPE_NUMBER)
-#    else:
-#        abort_run(opcode, offset)
 
 
 def bytecode_pow(opcode, offset, more):
@@ -328,13 +331,6 @@ def bytecode_random(opcode, offset, more):
 def bytecode_sqrt(opcode, offset, more):
     if precheck([TYPE_NUMBER]):
         stack_push(math.sqrt(stack_pop()), TYPE_NUMBER)
-    else:
-        abort_run(opcode, offset)
-
-
-def bytecode_round(opcode, offset, more):
-    if precheck([TYPE_NUMBER]):
-        stack_push(round(stack_pop()), TYPE_NUMBER)
     else:
         abort_run(opcode, offset)
 
@@ -472,7 +468,7 @@ def bytecode_flow_times(opcode, offset, more):
 
 
 def bytecode_flow_call(opcode, offset, more):
-    if precheck([TYPE_POINTER]) or precheck([TYPE_FUNCTION_CALL]):
+    if precheck([TYPE_POINTER]) or precheck([TYPE_FUNCALL]):
         a = stack_pop()
         interpret(a, more)
     else:
@@ -537,7 +533,7 @@ def bytecode_flow_abort(opcode, offset, more):
 
 
 def bytecode_mem_copy(opcode, offset, more):
-    if precheck([TYPE_POINTER, TYPE_POINTER]):
+    if precheck([TYPE_ANY_PTR, TYPE_ANY_PTR]):
         a = stack_pop()
         b = stack_pop()
         copy_slice(b, a)
@@ -647,7 +643,7 @@ def bytecode_stack_swap(opcode, offset, more):
 
 
 def bytecode_stack_depth(opcode, offset, more):
-    stack_push(len(stack), TYPE_NUMBER)
+    stack_push(stack_depth(), TYPE_NUMBER)
 
 
 def bytecode_quote_name(opcode, offset, more):
@@ -713,10 +709,11 @@ def bytecode_slice_reverse(opcode, offset, more):
     if precheck([TYPE_POINTER]) or \
        precheck([TYPE_STRING]) or \
        precheck([TYPE_REMARK]):
-        a = stack_pop()
-        memory_values[int(a)] = memory_values[int(a)][::-1]
-        memory_types[int(a)] = memory_types[int(a)][::-1]
-        stack_push(a, TYPE_POINTER)
+        a, t = stack_pop(type = True)
+        a = int(a)
+        memory_values[a] = memory_values[a][::-1]
+        memory_types[a] = memory_types[a][::-1]
+        stack_push(a, t)
     else:
         abort_run(opcode, offset)
 
@@ -767,7 +764,7 @@ def bytecode_report(opcode, offset, more):
 def bytecode_vm_names(opcode, offset, more):
     s = request_slice()
     i = 0
-    for word in dictionary_names:
+    for word in dictionary_names():
         value = string_to_slice(word)
         store(value, s, i, TYPE_STRING)
         i = i + 1
@@ -777,7 +774,7 @@ def bytecode_vm_names(opcode, offset, more):
 def bytecode_vm_slices(opcode, offset, more):
     s = request_slice()
     i = 0
-    for ptr in dictionary_slices:
+    for ptr in dictionary_slices():
         store(ptr, s, i, TYPE_POINTER)
         i = i + 1
     stack_push(s, TYPE_POINTER)
@@ -889,7 +886,6 @@ bytecodes = {
     BC_BITWISE_XOR:    bytecode_bitwise_xor,
     BC_RANDOM:         bytecode_random,
     BC_SQRT:           bytecode_sqrt,
-    BC_ROUND:          bytecode_round,
     BC_COMPARE_LT:     bytecode_compare_lt,
     BC_COMPARE_GT:     bytecode_compare_gt,
     BC_COMPARE_LTEQ:   bytecode_compare_lteq,
@@ -995,18 +991,18 @@ def abort_run(opcode, offset):
 
 def precheck(req):
     flag = True
-    if len(stack) < len(req):
+    if stack_depth() < len(req):
         flag = False
-    i = len(stack) - 1
+    i = stack_depth() - 1
     if flag:
         for t in reversed(req):
             if t == TYPE_ANY_PTR:
-                if types[i] != TYPE_POINTER and \
-                   types[i] != TYPE_STRING and \
-                   types[i] != TYPE_REMARK and \
-                   types[i] != TYPE_FUNCTION_CALL:
+                if stack_type_for(i) != TYPE_POINTER and \
+                   stack_type_for(i) != TYPE_STRING and \
+                   stack_type_for(i) != TYPE_REMARK and \
+                   stack_type_for(i) != TYPE_FUNCALL:
                     flag = False
-            elif t != types[i] and t != TYPE_ANY:
+            elif t != stack_type_for(i) and t != TYPE_ANY:
                 flag = False
             i = i - 1
     return flag
@@ -1016,8 +1012,6 @@ def precheck(req):
 #
 # - pushing values to the stack (based on stored type)
 # - invoking the handler for each byte code
-# - the BC_FLOW_RETURN instruction (which jumps to the end of the slice,
-#   halting execution).
 # - sets / clears the **current_slice** variable
 
 def interpret(slice, more=None):
@@ -1034,13 +1028,11 @@ def interpret(slice, more=None):
             stack_push(opcode, optype)
             if optype == TYPE_REMARK:
                 stack_pop()
-            if optype == TYPE_FUNCTION_CALL:
+            if optype == TYPE_FUNCALL:
                 interpret(stack_pop(), more)
         else:
             if opcode in bytecodes:
                 bytecodes[opcode](opcode, offset, more)
-            elif opcode == BC_FLOW_RETURN:
-                offset = size
             if more is not None:
                 offset = more(slice, offset, opcode)
         offset += 1
@@ -1054,48 +1046,113 @@ def interpret(slice, more=None):
 # last-in, first-out (LIFO) model. But it does track types as well as the raw
 # values.
 
-stack = []    # holds the data items
-types = []    # holds the types for data items
+stack = []
+
+
+def format_item(prefix, value):
+    return  prefix + str(value)
+
+def parsed_stack():
+    i = 0
+    r = []
+    while i < len(stack):
+        tos = stack_value_for(i)
+        type = stack_type_for(i)
+        if type == TYPE_NUMBER:
+            r.append(format_item('#', tos))
+        elif type == TYPE_BYTECODE:
+            r.append(format_item('`', tos))
+        elif type == TYPE_CHARACTER:
+            r.append(format_item('$', chr(tos)))
+        elif type == TYPE_STRING:
+            r.append(format_item('\'', slice_to_string(tos) + '\''))
+        elif type == TYPE_POINTER:
+            r.append(format_item('&', tos))
+        elif type == TYPE_FUNCALL:
+            r.append(format_item('|', tos))
+        elif type == TYPE_REMARK:
+            r.append(format_item('"', slice_to_string(tos) + '"'))
+        elif type == TYPE_FLAG:
+            if tos == -1:
+                r.append(format_item("", "true"))
+            elif tos == 0:
+                r.append(format_item("", "false"))
+            else:
+                r.append(format_item("", "malformed flag"))
+        else:
+            r.append(format_item("", "unmatched type on the stack"))
+        sys.stdout.write("\n")
+        i += 1
+    return r
+
+
+def stack_values():
+    r = []
+    for w in stack:
+        r.append(w[0])
+    return r
+
+
+def stack_types():
+    r = []
+    for w in stack:
+        r.append(w[1])
+    return r
+
+
+def stack_depth():
+    return len(stack)
+
+
+def stack_type_for(d):
+    return stack[d][1]
+
+
+def stack_value_for(d):
+    return stack[d][0]
 
 
 def stack_clear():
     """remove all values from the stack"""
-    global stack, types
+    global stack
     stack = []
-    types = []
 
 
 def stack_push(value, type):
     """push a value to the stack"""
-    global stack, types
-    stack.append(value)
-    types.append(type)
+    global stack
+    stack.append((value, type))
 
 
 def stack_drop():
     """remove a value from the stack"""
-    global stack, types
-    stack_pop()
+    global stack
+    stack.pop()
 
 
-def stack_pop(type = False):
+def stack_pop(type = False, fifo = False):
     """remove and return a value from the stack"""
-    global stack, types
-    if type:
-        return stack.pop(), types.pop()
+    global stack
+    if fifo:
+        if type:
+            return stack.pop(0)
+        else:
+            return stack.pop(0)[0]
     else:
-        types.pop()
-        return stack.pop()
+        if type:
+            return stack.pop()
+        else:
+            return stack.pop()[0]
 
 
 def tos():
     """return a pointer to the top element in the stack"""
-    return len(stack) - 1
+    return stack_depth() - 1
 
 
 def stack_type():
     """return the type identifier for the top item on the stack"""
-    return types[tos()]
+    return stack_type_for(tos())
 
 
 def stack_swap():
@@ -1121,22 +1178,22 @@ def stack_dup():
 
 def stack_change_type(desired):
     """convert the type of an item on the stack to a different type"""
-    global types, stack
+    global stack
     original = stack_type()
     if desired == TYPE_BYTECODE:
         if original == TYPE_NUMBER:
-            types.pop()
-            types.append(TYPE_BYTECODE)
+            a = stack_pop()
+            stack_push(a, TYPE_BYTECODE)
     elif desired == TYPE_NUMBER:
         if original == TYPE_STRING:
-            if is_number(slice_to_string(stack[tos()])):
-                stack_push(float(slice_to_string(stack_pop())), TYPE_NUMBER)
+            a = stack_pop()
+            if is_number(slice_to_string(a)):
+                stack_push(float(slice_to_string(a)), TYPE_NUMBER)
             else:
-                stack_pop()
                 stack_push(float('nan'), TYPE_NUMBER)
         else:
-            types.pop()
-            types.append(TYPE_NUMBER)
+            a = stack_pop()
+            stack_push(a, TYPE_NUMBER)
     elif desired == TYPE_STRING:
         if original == TYPE_NUMBER:
             stack_push(string_to_slice(str(stack_pop())), TYPE_STRING)
@@ -1155,8 +1212,8 @@ def stack_change_type(desired):
             else:
                 stack_push(string_to_slice('malformed flag'), TYPE_STRING)
         elif original == TYPE_POINTER or original == TYPE_REMARK:
-            types.pop()
-            types.append(TYPE_STRING)
+            a = stack_pop()
+            stack_push(a, TYPE_STRING)
         else:
             return 0
     elif desired == TYPE_CHARACTER:
@@ -1167,8 +1224,8 @@ def stack_change_type(desired):
             s = stack_pop()
             stack_push(int(s), TYPE_CHARACTER)
     elif desired == TYPE_POINTER:
-        types.pop()
-        types.append(TYPE_POINTER)
+        a = stack_pop()
+        stack_push(a, TYPE_POINTER)
     elif desired == TYPE_FLAG:
         if original == TYPE_STRING:
             s = slice_to_string(stack_pop())
@@ -1181,10 +1238,10 @@ def stack_change_type(desired):
         else:
             s = stack_pop()
             stack_push(s, TYPE_FLAG)
-    elif desired == TYPE_FUNCTION_CALL:
+    elif desired == TYPE_FUNCALL:
         if original == TYPE_NUMBER or original == TYPE_POINTER:
             a = stack_pop()
-            stack_push(a, TYPE_FUNCTION_CALL)
+            stack_push(a, TYPE_FUNCALL)
     else:
         a = stack_pop()
         stack_push(a, desired)
@@ -1197,53 +1254,81 @@ def stack_change_type(desired):
 # of two arrays: one for the names and a second one for the pointers.
 
 dictionary_warnings = False     # Used to trigger a warning if a name is redefined
-dictionary_names = []           # Holds the names for each slice
-dictionary_slices = []          # Holds the slice for each name
 dictionary_hidden_slices = []   # Holds a list of slices that previously had names
+dictionary = []
+
+def dictionary_names():
+    r = []
+    for w in dictionary:
+        r.append(w[0])
+    return r
+
+
+def dictionary_slices():
+    r = []
+    for w in dictionary:
+        r.append(w[1])
+    return r
 
 
 def in_dictionary(s):
-    return s in dictionary_names
+    for w in dictionary_names():
+        if w == s:
+            return True
+    return False
+
+
+def dict_entry(name):
+    for i in dictionary:
+        if i[0] == name:
+            return i[1]
+    return -1
+
+
+def dict_index(name):
+    n = 0
+    for i in dictionary:
+        if i[0] == name:
+            return n
+        n = n + 1
+    return -1
 
 
 def lookup_pointer(name):
     if in_dictionary(name) is False:
         return -1
     else:
-        return dictionary_slices[dictionary_names.index(name)]
+        return dict_entry(name)
 
 
 def add_definition(name, slice):
-    global dictionary_names, dictionary_slices
+    global dictionary
     if in_dictionary(name) is False:
-        dictionary_names.append(name)
-        dictionary_slices.append(slice)
+        dictionary.append((name, slice))
     else:
         if dictionary_warnings:
             report('W10: ' + name + ' redefined')
-        target = dictionary_slices[dictionary_names.index(name)]
+        target = lookup_pointer(name)
         copy_slice(slice, target)
-    return dictionary_names.index(name)
 
 
 def remove_name(name):
-    global dictionary_names, dictionary_slices, dictionary_hidden_slices
+    global dictionary, dictionary_hidden_slices
     if in_dictionary(name) is not False:
-        i = dictionary_names.index(name)
-        del dictionary_names[i]
-        if not dictionary_slices[i] in dictionary_hidden_slices:
-            dictionary_hidden_slices.append(dictionary_slices[i])
-        del dictionary_slices[i]
+        i = dict_index(name)
+        if not dictionary[i][1] in dictionary_hidden_slices:
+            dictionary_hidden_slices.append(dictionary[i][1])
+        del dictionary[i]
 
 
 def pointer_to_name(ptr):
     """given a parable pointer, return the corresponding name, or"""
     """an empty string"""
-    global dictionary_names, dictionary_slices
-    s = ""
-    if ptr in dictionary_slices:
-        s = dictionary_names[dictionary_slices.index(ptr)]
-    return s
+    for i in dictionary:
+        if i[1] == ptr:
+            return i[0]
+    return ''
+
 
 # -+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 
@@ -1262,7 +1347,7 @@ memory_size = []      # A simple structure for indicating the number of items
                       # in each slice
 
 
-def request_slice(attempts=1):
+def request_slice():
     """request a new memory slice"""
     global memory_values, memory_types, memory_map, memory_size
     i = 0
@@ -1275,17 +1360,20 @@ def request_slice(attempts=1):
             return i
         else:
             i += 1
-    if attempts == 1:
-        i = 0
-        while i < 10:
-            memory_map.append(0)
-            memory_values.append(0)
-            memory_types.append(0)
-            memory_size.append(0)
-            i = i + 1
-        return request_slice(2)
-    else:
-        return -1
+    x = 0
+    while x < 1250:
+        memory_map.append(0)
+        memory_values.append([0])
+        memory_types.append([0])
+        memory_size.append(0)
+        x = x + 1
+#    if stack_depth() == 0:
+#        collect_garbage()
+    memory_map[i] = 1
+    memory_values[i] = [0]
+    memory_types[i] = [0]
+    memory_size[i] = 0
+    return i
 
 
 def release_slice(slice):
@@ -1294,8 +1382,8 @@ def release_slice(slice):
     slice = int(slice)
     memory_map[slice] = 0
     memory_size[slice] = 0
-    memory_values[slice] = 0
-    memory_types[slice] = 0
+    memory_values[slice] = [0]
+    memory_types[slice] = [0]
 
 
 
@@ -1405,7 +1493,7 @@ def is_pointer(type):
     if type == TYPE_POINTER or \
        type == TYPE_STRING or \
        type == TYPE_REMARK or \
-       type == TYPE_FUNCTION_CALL:
+       type == TYPE_FUNCALL:
         flag = True
     else:
         flag = False
@@ -1446,11 +1534,11 @@ def find_references(s):
 
 def seek_all_references():
     """return a list of all references in all named slices and stack items"""
-    global dictionary_slices, stack, types, current_slice
+    global dictionary, stack, types, current_slice
     sources = []
 
     # Named items
-    for s in dictionary_slices:
+    for s in dictionary_slices():
         if not s in sources:
             sources.append(s)
 
@@ -1466,8 +1554,8 @@ def seek_all_references():
     # Strings, comments, pointers, function calls on the stack
     i = tos()
     while i >= 0:
-        if is_pointer(types[i]):
-            sources.append(stack[i])
+        if is_pointer(stack_type_for(i)):
+            sources.append(stack_value_for(i))
         i = i - 1
 
     refs = sources
@@ -1523,8 +1611,8 @@ def collect_garbage():
 #
 # These correspond to the following bytecode sequences:
 #
-#   &<pointer> #0 fetch
-#   &<pointer> #0 store
+#   &<pointer> #1 fetch
+#   &<pointer> #1 store
 #
 # The compiler handle two implicit pieces of functionality: [ and ]. These
 # are used to begin and end quotations.
@@ -1588,11 +1676,24 @@ def compile_bytecode(bytecode, slice, offset):
 
 def compile_function_call(name, slice, offset):
     if lookup_pointer(name) != -1:
-        store(lookup_pointer(name), slice, offset, TYPE_FUNCTION_CALL)
+        store(lookup_pointer(name), slice, offset, TYPE_FUNCALL)
         offset += 1
     else:
         if name != "":
-            report('E03: Compile Error: Unable to map `' + name + '` to a pointer')
+           report('E03: Compile Error: Unable to map `' + name + '` to a pointer')
+    return offset
+
+
+def compile_function_call_prefixed(name, slice, offset):
+    if lookup_pointer(name) != -1:
+        store(lookup_pointer(name), slice, offset, TYPE_FUNCALL)
+        offset += 1
+    else:
+        if is_number(name):
+            store(int(name), slice, offset, TYPE_FUNCALL)
+            offset += 1
+        else:
+           report('E03: Compile Error: Unable to map `' + name + '` to a pointer')
     return offset
 
 
@@ -1622,7 +1723,7 @@ def parse_string(tokens, i, count, delimiter):
 def compile(str, slice):
     global should_abort
     should_abort = False
-    prefixes = { '`', '#', '$', '&', '\'', '"', '@', '!', }
+    prefixes = { '`', '#', '$', '&', '\'', '"', '@', '!', '|' }
     nest = []
     tokens = ' '.join(str.split()).split(' ')
     count = len(tokens)
@@ -1661,6 +1762,8 @@ def compile(str, slice):
             offset = compile_pointer(current, slice, offset)
             offset = compile_number(1, slice, offset)
             offset = compile_bytecode(BC_MEM_STORE, slice, offset)
+        elif prefix == "|":
+            offset = compile_function_call_prefixed(current, slice, offset)
         elif current == "[":
             nest.append(slice)
             nest.append(offset)
@@ -1673,7 +1776,7 @@ def compile(str, slice):
             else:
                 old = slice
                 if offset == 0:
-                    store(BC_FLOW_RETURN, slice, offset, TYPE_BYTECODE)
+                    store(BC_NOP, slice, offset, TYPE_BYTECODE)
                 offset = nest.pop()
                 slice = nest.pop()
                 store(old, slice, offset, TYPE_POINTER)
@@ -1685,7 +1788,7 @@ def compile(str, slice):
                 offset = compile_function_call(current, slice, offset)
         i += 1
         if offset == 0:
-            store(BC_FLOW_RETURN, slice, offset, TYPE_BYTECODE)
+            store(BC_NOP, slice, offset, TYPE_BYTECODE)
     if len(nest) != 0:
         report('E03: Compile Error - quotations not balanced')
     return slice
@@ -1711,5 +1814,5 @@ def parse_bootstrap(f):
 def prepare_dictionary():
     """setup the initial dictionary"""
     s = request_slice()
-    compile('"ps-" `48 "Attach a name to a pointer"', s)
+    compile('"ps-" `{0} "Attach a name to a pointer"'.format(BC_QUOTE_NAME), s)
     add_definition(':', s)
